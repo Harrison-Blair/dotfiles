@@ -1,0 +1,67 @@
+* {
+	
+	font-family: "Noto Sans Mono";
+	font-size: 17px;
+	
+	color: rgb(255, 124, 255);
+	min-height: 0;
+
+	background-color: transparent;
+}
+
+tooltip {
+	background-color: rgba(30, 30, 30, 0.75);
+	border: 1px solid #666666;
+}
+
+.modules-left {
+	background-color: rgba(30, 30, 30, 0.66);
+	border: 1px solid #666666;
+	border-radius: 15px;
+}
+
+.modules-right {
+	background-color: rgba(30, 30, 30, 0.66);
+	padding: 0 10px 0 10px;
+	border: 1px solid #666666;
+	border-radius: 15px;
+}
+
+
+/* Hyprland Window Styling */
+window#waybar.empty .modules-center{
+    background: transparent;
+		border: 0px;
+}
+
+#workspaces button:hover {
+  background: rgba(175, 75, 175, 1);
+}
+
+#workspaces button {
+	padding: 0 10px 0 10px;
+	border-radius: 15px;
+}
+
+#workspaces button.active {
+	background: rgba(175, 75, 175, 0.75);
+}
+
+#custom-restart {
+	padding: 0 12px 0 4px;
+	margin-left: 4px;
+	border-radius: 10px;
+}
+
+/* Inter-group separator (defined in config.jsonc as custom/sep).
+   Rendered as a thin vertical bar spanning full waybar height:
+   background fills the module box, the space glyph is hidden via
+   transparent color + tiny font-size, width set by min-width. */
+#custom-sep {
+	background-color: #666666;
+	color: transparent;
+	font-size: 1px;
+	min-width: 2px;
+	padding: 0;
+	margin: 0;
+}

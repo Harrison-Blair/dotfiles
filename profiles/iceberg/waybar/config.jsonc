@@ -1,0 +1,185 @@
+{
+	///////////////////////
+	/// General Styling ///
+	///////////////////////
+	"layer": "top",
+	"output": "!DP-3",
+	"width": "auto",
+	"height": 25,
+	"spacing": 8,
+	"reload_style_on_change": true,
+
+	///////////////////////////
+	/// Modules Definitions ///
+	///////////////////////////
+	"modules-left": [
+		"hyprland/workspaces"
+	],
+	"modules-right": [
+		"pulseaudio",
+		"custom/sep",
+		"network",
+		"memory",
+		"cpu",
+		"custom/sep",
+		"temperature#cpu",
+		"temperature#gpu",
+		"temperature#gpu-mem",
+		"temperature#igpu",
+		"temperature#nvme",
+		"custom/sep",
+		"clock#utc",
+		"clock#local",
+		"custom/sep",
+		"custom/restart"
+	],
+	
+	///////////////////////
+	/// Module Settings ///
+	///////////////////////
+	"custom/sep": {
+		"format": " ",
+		"tooltip": false
+	},
+
+	"pulseaudio": {
+		"format": "{volume}% <span size='x-large'>{icon}</span>",
+		"format-muted": "Mute 󰸈",
+		"format-icons": [
+			"󰕿",
+			"",
+			""
+		]
+	},
+
+	"network": {
+		"interval": 1,
+		"min-length": 28,
+		"max-length": 28,
+		"format": "<span size='x-large'>{icon}</span>  {bandwidthDownBytes:>4}  {bandwidthUpBytes:>4} ",
+		"format-disconnected": "<span size='x-large'>󰯡</span>",
+		"format-wifi": "<span size='x-large'>{icon}</span>  {bandwidthDownBytes:>4}  {bandwidthUpBytes:>4} ",
+		"format-ethernet": "<span size='x-large'>󰈀</span>  {bandwidthDownBytes:>4}  {bandwidthUpBytes:>4} ",
+		"format-icons": [
+			"<span color='#dd532e'>󰤯</span>", // r
+			"<span color='#ffffa5'>󰤟</span>", // y
+			"󰤢",
+			"󰤥",
+			"󰤨"
+		],
+		"tooltip-format": "SSID\t: {essid}\rFreq\t: {frequency}GHz\rSignal\t: {signalStrength}%\r\rGateway\t: {gwaddr}\rIPv4\t: {ipaddr}"
+	},
+
+	"memory": {
+		"interval": 1,
+		"min-length": 11,
+		"max-length": 11,
+		"format": "<span size='x-large'></span>  {used:0.2f}G",
+		"tooltip-format": "Memory:\t{used:0.2f} / {total:0.2f} | {percentage:>3}%\nSwap:\t{swapUsed:0.2f} / {swapTotal:0.2f} | {swapPercentage:>3}%"
+	},
+
+	"cpu": {
+		"interval": 1,
+		"format": "<span size='x-large'></span>  {icon0}{icon1}{icon2}{icon3}{icon4}{icon5}{icon6}{icon7}{icon8}{icon9}{icon10}{icon11}{icon12}{icon13}{icon14}{icon15}",
+		"format-icons": [
+			"▁",
+			"▂", 
+			"▃", 
+			"▄", 
+			"▅",
+			"▆",
+			"<span color='#ff9977'>▇</span>", // orange
+			"<span color='#dd532e'>█</span>" // red
+		]
+	},
+	/////////////////////////////////////////////////////////////////////
+	/// Temperature Modules                                           ///
+	/////////////////////////////////////////////////////////////////////
+	// Each "temperature#name" block reads ONE sensor. To discover what
+	// your machine exposes, run:   sensors
+	// To map a sensor to a stable hwmon path (hwmonN numbers shuffle on
+	// reboot, PCI paths do not), run:
+	//   for h in /sys/class/hwmon/hwmon*; do
+	//     echo "$h  ->  $(cat $h/name)  ->  $(readlink -f $h)"
+	//   done
+	// Then point "hwmon-path-abs" at the *parent* of the hwmonN dir
+	// (waybar will glob for hwmon* inside it) and set "input-filename"
+	// to the tempN_input that matches the label you want.
+	//
+	// Currently mapped on this machine:
+	//   CPU        k10temp/Tctl       (00:18.3, temp1)
+	//   dGPU edge  amdgpu             (03:00.0, temp1)  — die edge
+	//   dGPU mem   amdgpu             (03:00.0, temp3)  — VRAM, often the hottest
+	//   iGPU       amdgpu APU         (0e:00.0, temp1)
+	//   NVMe       nvme Composite     (04:00.0, temp1)
+	// Not mapped (add a block if you want them): RAM DIMMs (spd5118),
+	// WiFi (mt7921), Ethernet PHY (r8169), dGPU junction (temp2).
+
+	"temperature#cpu": {
+		"interval": 2,
+		"hwmon-path-abs": "/sys/devices/pci0000:00/0000:00:18.3/hwmon",
+		"input-filename": "temp1_input",
+		"critical-threshold": 85,
+		"format": "<span size='x-large'></span>  {temperatureC}°",
+		"format-critical": "<span size='x-large' color='#dd532e'></span> <span color='#dd532e'>{temperatureC}°</span>",
+		"tooltip-format": "CPU (k10temp Tctl)\t{temperatureC}°C / {temperatureF}°F"
+	},
+
+	"temperature#gpu": {
+		"interval": 2,
+		"hwmon-path-abs": "/sys/devices/pci0000:00/0000:00:01.1/0000:01:00.0/0000:02:00.0/0000:03:00.0/hwmon",
+		"input-filename": "temp1_input",
+		"critical-threshold": 90,
+		"format": "<span size='x-large'>󰢮</span>  {temperatureC}°",
+		"format-critical": "<span size='x-large' color='#dd532e'>󰢮</span> <span color='#dd532e'>{temperatureC}°</span>",
+		"tooltip-format": "dGPU edge (amdgpu)\t{temperatureC}°C / {temperatureF}°F"
+	},
+
+	"temperature#gpu-mem": {
+		"interval": 2,
+		"hwmon-path-abs": "/sys/devices/pci0000:00/0000:00:01.1/0000:01:00.0/0000:02:00.0/0000:03:00.0/hwmon",
+		"input-filename": "temp3_input",
+		"critical-threshold": 95,
+		"format": "<span size='x-large'>󰧶</span>  {temperatureC}°",
+		"format-critical": "<span size='x-large' color='#dd532e'>󰧶</span> <span color='#dd532e'>{temperatureC}°</span>",
+		"tooltip-format": "dGPU memory (VRAM)\t{temperatureC}°C / {temperatureF}°F"
+	},
+
+	"temperature#igpu": {
+		"interval": 5,
+		"hwmon-path-abs": "/sys/devices/pci0000:00/0000:00:08.1/0000:0e:00.0/hwmon",
+		"input-filename": "temp1_input",
+		"critical-threshold": 90,
+		"format": "<span size='x-large'>󰍛</span>  {temperatureC}°",
+		"format-critical": "<span size='x-large' color='#dd532e'>󰍛</span> <span color='#dd532e'>{temperatureC}°</span>",
+		"tooltip-format": "iGPU edge (APU)\t{temperatureC}°C / {temperatureF}°F"
+	},
+
+	"temperature#nvme": {
+		"interval": 5,
+		"hwmon-path-abs": "/sys/devices/pci0000:00/0000:00:01.2/0000:04:00.0/nvme/nvme0",
+		"input-filename": "temp1_input",
+		"critical-threshold": 75,
+		"format": "<span size='x-large'>󰋊</span>  {temperatureC}°",
+		"format-critical": "<span size='x-large' color='#dd532e'>󰋊</span> <span color='#dd532e'>{temperatureC}°</span>",
+		"tooltip-format": "NVMe Composite\t{temperatureC}°C / {temperatureF}°F"
+	},
+
+	"clock#utc": {
+		"timezone": "Etc/UTC",
+		"interval": 1,
+		"format": "UTC {:%H:%M:%S}",
+		"tooltip-format": "{:%A, %B %d, %Y }"
+	},
+	"clock#local": {
+		"interval": 1,
+		"format": "EST {:%H:%M:%S}",
+		"tooltip-format": "{:%A, %B %d, %Y }"
+	},
+
+	"custom/restart": {
+		"format": "<span size='large'>󰃢</span>",
+		"tooltip": "Restart Waybar",
+		"on-click": "killall -SIGUSR2 waybar"
+	}
+}
