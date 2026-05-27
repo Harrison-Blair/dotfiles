@@ -79,17 +79,16 @@ def cmd_sync(_: argparse.Namespace) -> None:
         console.print("[yellow]Nothing selected; aborting.[/yellow]")
         return
 
-    target_dir = PROFILES_DIR / hostname
-    target_dir.mkdir(parents=True, exist_ok=True)
+    PROFILES_DIR.mkdir(parents=True, exist_ok=True)
     for name in chosen:
         src = CONFIG_DIR / name
         if not src.exists():
             console.print(f"[red]Missing {src}, skipping.[/red]")
             continue
-        replace_tree(src, target_dir / name)
+        replace_tree(src, PROFILES_DIR / name)
         console.print(f"  copied [cyan]{name}[/cyan]")
 
-    rel = target_dir.relative_to(REPO_ROOT)
+    rel = PROFILES_DIR.relative_to(REPO_ROOT)
     subprocess.run(["git", "add", "-f", "--", str(rel)], cwd=REPO_ROOT, check=True)
     staged = subprocess.run(
         ["git", "diff", "--cached", "--quiet"], cwd=REPO_ROOT
@@ -118,65 +117,43 @@ def apply_one(src: Path, name: str, ts: str) -> None:
     console.print(f"  applied [cyan]{name}[/cyan]")
 
 
-def cmd_apply(args: argparse.Namespace) -> None:
-    profile_name = args.profile_opt or args.profile_arg
-    if profile_name:
-        path = PROFILES_DIR / profile_name
-        if not path.is_dir():
-            console.print(f"[red]Profile not found: {profile_name}[/red]")
-            return
-        available = sorted(p.name for p in path.iterdir() if p.is_dir())
-        if not available:
-            console.print(f"[yellow]No configs in profile {profile_name}.[/yellow]")
-            return
-        ts = datetime.now().strftime("%Y%m%d-%H%M%S")
-        for name in available:
-            apply_one(path / name, name, ts)
-        return
-
-    profiles = (
-        sorted(p for p in PROFILES_DIR.iterdir() if p.is_dir())
+def cmd_apply(_: argparse.Namespace) -> None:
+    available = (
+        sorted(p.name for p in PROFILES_DIR.iterdir() if p.is_dir())
         if PROFILES_DIR.exists()
         else []
     )
     backups = sorted(CONFIG_DIR.glob("*.bak-*"))
-    sources: list[tuple[Path, str]] = []
 
-    if profiles:
-        console.print("[bold]Profiles:[/bold]")
-        for p in profiles:
-            sources.append((p, "profile"))
-            console.print(f"  {len(sources):>2}. {p.name}")
-    if backups:
-        console.print("[bold]Backups:[/bold]")
-        for b in backups:
-            sources.append((b, "backup"))
-            console.print(f"  {len(sources):>2}. {b.name}")
-
-    if not sources:
-        console.print("[red]No profiles or backups found.[/red]")
+    if not available and not backups:
+        console.print("[red]No configs or backups found.[/red]")
         return
 
-    pick = Prompt.ask(
-        "Pick source",
-        choices=[str(i) for i in range(1, len(sources) + 1)],
-        default="1",
-    )
-    path, kind = sources[int(pick) - 1]
     ts = datetime.now().strftime("%Y%m%d-%H%M%S")
 
-    if kind == "profile":
-        available = sorted(p.name for p in path.iterdir() if p.is_dir())
-        profile_defaults = [n for n in available if n in DEFAULTS]
-        chosen = select_configs(available, profile_defaults)
-        if not chosen:
-            console.print("[yellow]Nothing selected.[/yellow]")
+    if available:
+        defaults = [n for n in available if n in DEFAULTS]
+        chosen = select_configs(available, defaults)
+        if chosen:
+            for name in chosen:
+                apply_one(PROFILES_DIR / name, name, ts)
             return
-        for name in chosen:
-            apply_one(path / name, name, ts)
-    else:
+
+    if backups:
+        console.print("[bold]Backups:[/bold]")
+        for i, b in enumerate(backups, 1):
+            console.print(f"  {i:>2}. {b.name}")
+        pick = Prompt.ask(
+            "Pick backup",
+            choices=[str(i) for i in range(1, len(backups) + 1)],
+            default="1",
+        )
+        path = backups[int(pick) - 1]
         original = path.name.split(".bak-", 1)[0]
         apply_one(path, original, ts)
+        return
+
+    console.print("[yellow]Nothing selected.[/yellow]")
 
 
 def cmd_clean_backups(_: argparse.Namespace) -> None:
@@ -203,22 +180,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(prog="tui", description="dotfiles TUI")
     parser.add_argument("-v", "--verbose", action="store_true", help="enable verbose output")
     sub = parser.add_subparsers(dest="command", required=True)
-    sub.add_parser("sync", help="copy live configs into profiles/<hostname>/ and push")
-    apply_parser = sub.add_parser("apply", help="apply a profile from profiles/ to ~/.config")
-    apply_parser.add_argument(
-        "profile_arg",
-        nargs="?",
-        default=None,
-        metavar="profile",
-        help="profile name to apply (case sensitive); bypasses menu",
-    )
-    apply_parser.add_argument(
-        "-p",
-        "--profile",
-        dest="profile_opt",
-        default=None,
-        help="profile name to apply (case sensitive); bypasses menu",
-    )
+    sub.add_parser("sync", help="copy live configs into profiles/ and push")
+    sub.add_parser("apply", help="apply configs from profiles/ to ~/.config")
     sub.add_parser("clean-backups", help="list and delete *.bak-* in ~/.config")
     return parser.parse_args(argv)
 
