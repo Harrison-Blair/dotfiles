@@ -127,13 +127,13 @@ def cmd_apply(args: argparse.Namespace) -> None:
     )
     backups = sorted(CONFIG_DIR.glob("*.bak-*"))
 
-    if args.names:
-        missing = [n for n in args.names if n not in available]
+    if args.apply:
+        missing = [n for n in args.apply if n not in available]
         if missing:
             console.print(f"[red]Not found in profiles/: {', '.join(missing)}[/red]")
             return
         ts = datetime.now().strftime("%Y%m%d-%H%M%S")
-        for name in args.names:
+        for name in args.apply:
             apply_one(PROFILES_DIR / name, name, ts)
         return
 
@@ -191,26 +191,24 @@ def cmd_clean_backups(_: argparse.Namespace) -> None:
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(prog="tui", description="dotfiles TUI")
     parser.add_argument("-v", "--verbose", action="store_true", help="enable verbose output")
-    sub = parser.add_subparsers(dest="command", required=True)
-    sub.add_parser("sync", help="copy live configs into profiles/ and push")
-    apply_parser = sub.add_parser("apply", help="apply configs from profiles/ to ~/.config")
-    apply_parser.add_argument(
-        "names",
-        nargs="*",
-        help="config names to apply non-interactively (e.g. waybar hypr)",
-    )
-    sub.add_parser("clean-backups", help="list and delete *.bak-* in ~/.config")
+    group = parser.add_mutually_exclusive_group(required=True)
+    group.add_argument("-s", "--sync", action="store_true",
+                       help="copy live configs into profiles/ and push")
+    group.add_argument("-a", "--apply", nargs="*", default=None, metavar="NAME",
+                       help="apply configs from profiles/ to ~/.config (optional names for non-interactive)")
+    group.add_argument("-c", "--clean-backups", action="store_true",
+                       help="list and delete *.bak-* in ~/.config")
     return parser.parse_args(argv)
 
 
 def main(argv: list[str] | None = None) -> None:
     args = parse_args(argv)
-    handlers = {
-        "sync": cmd_sync,
-        "apply": cmd_apply,
-        "clean-backups": cmd_clean_backups,
-    }
-    handlers[args.command](args)
+    if args.sync:
+        cmd_sync(args)
+    elif args.apply is not None:
+        cmd_apply(args)
+    elif args.clean_backups:
+        cmd_clean_backups(args)
 
 
 if __name__ == "__main__":
