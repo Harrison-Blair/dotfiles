@@ -22,11 +22,12 @@
 		"memory",
 		"cpu",
 		"custom/sep",
-		"temperature#cpu",
-		"temperature#gpu",
-		"temperature#gpu-mem",
-		"temperature#igpu",
-		"temperature#nvme",
+		"custom/temp-cpu",
+		"custom/temp-gpu",
+		"custom/temp-gpu-mem",
+		"custom/temp-igpu",
+		"custom/temp-nvme",
+		"custom/battery",
 		"custom/sep",
 		"clock#utc",
 		"clock#local",
@@ -43,8 +44,8 @@
 	},
 
 	"pulseaudio": {
-		"format": "{volume}% <span size='x-large'>{icon}</span>",
-		"format-muted": "Mute 󰸈",
+		"format": "{volume}%  <span size='x-large'>{icon}</span> ",
+		"format-muted": "Mute  <span size='x-large'>󰸈</span> ",
 		"format-icons": [
 			"󰕿",
 			"",
@@ -67,7 +68,8 @@
 			"󰤥",
 			"󰤨"
 		],
-		"tooltip-format": "SSID\t: {essid}\rFreq\t: {frequency}GHz\rSignal\t: {signalStrength}%\r\rGateway\t: {gwaddr}\rIPv4\t: {ipaddr}"
+		"tooltip-format": "SSID\t: {essid}\rFreq\t: {frequency}GHz\rSignal\t: {signalStrength}%\r\rGateway\t: {gwaddr}\rIPv4\t: {ipaddr}",
+		"on-click": "kitty -e nmtui"
 	},
 
 	"memory": {
@@ -75,7 +77,8 @@
 		"min-length": 11,
 		"max-length": 11,
 		"format": "<span size='x-large'></span>  {used:0.2f}G",
-		"tooltip-format": "Memory:\t{used:0.2f} / {total:0.2f} | {percentage:>3}%\nSwap:\t{swapUsed:0.2f} / {swapTotal:0.2f} | {swapPercentage:>3}%"
+		"tooltip-format": "Memory:\t{used:0.2f} / {total:0.2f} | {percentage:>3}%\nSwap:\t{swapUsed:0.2f} / {swapTotal:0.2f} | {swapPercentage:>3}%",
+		"on-click": "kitty -e htop"
 	},
 
 	"cpu": {
@@ -90,79 +93,71 @@
 			"▆",
 			"<span color='#ff9977'>▇</span>", // orange
 			"<span color='#dd532e'>█</span>" // red
-		]
+		],
+		"on-click": "kitty -e htop"
 	},
 	/////////////////////////////////////////////////////////////////////
-	/// Temperature Modules                                           ///
+	/// Temperature + Battery Modules                                 ///
 	/////////////////////////////////////////////////////////////////////
-	// Each "temperature#name" block reads ONE sensor. To discover what
-	// your machine exposes, run:   sensors
-	// To map a sensor to a stable hwmon path (hwmonN numbers shuffle on
-	// reboot, PCI paths do not), run:
-	//   for h in /sys/class/hwmon/hwmon*; do
-	//     echo "$h  ->  $(cat $h/name)  ->  $(readlink -f $h)"
-	//   done
-	// Then point "hwmon-path-abs" at the *parent* of the hwmonN dir
-	// (waybar will glob for hwmon* inside it) and set "input-filename"
-	// to the tempN_input that matches the label you want.
+	// Sensors are resolved by chip name (k10temp / coretemp / amdgpu /
+	// nvme / i915 / nvidia) inside scripts/temp.sh, so this config is
+	// portable across machines without baking in PCI paths. Each module
+	// key (cpu, gpu, gpu-mem, igpu, nvme) maps to a case in the script
+	// which tries chips in order and emits an empty payload with class
+	// "empty" when none are present. The "empty" CSS class in style.css
+	// collapses the widget so missing sensors don't leave visible gaps.
 	//
-	// Currently mapped on this machine:
-	//   CPU        k10temp/Tctl       (00:18.3, temp1)
-	//   dGPU edge  amdgpu             (03:00.0, temp1)  — die edge
-	//   dGPU mem   amdgpu             (03:00.0, temp3)  — VRAM, often the hottest
-	//   iGPU       amdgpu APU         (0e:00.0, temp1)
-	//   NVMe       nvme Composite     (04:00.0, temp1)
-	// Not mapped (add a block if you want them): RAM DIMMs (spd5118),
-	// WiFi (mt7921), Ethernet PHY (r8169), dGPU junction (temp2).
+	// Likewise scripts/battery.sh reads /sys/class/power_supply/BAT* and
+	// emits empty on machines without a battery (the desktop).
+	//
+	// To add a new sensor: add a case in scripts/temp.sh, then a module
+	// here. To see what a new machine exposes, run:   sensors
 
-	"temperature#cpu": {
+	"custom/temp-cpu": {
+		"exec": "$HOME/.config/waybar/scripts/temp.sh cpu",
+		"return-type": "json",
 		"interval": 2,
-		"hwmon-path-abs": "/sys/devices/pci0000:00/0000:00:18.3/hwmon",
-		"input-filename": "temp1_input",
-		"critical-threshold": 85,
-		"format": "<span size='x-large'></span>  {temperatureC}°",
-		"format-critical": "<span size='x-large' color='#dd532e'></span> <span color='#dd532e'>{temperatureC}°</span>",
-		"tooltip-format": "CPU (k10temp Tctl)\t{temperatureC}°C / {temperatureF}°F"
+		"format": "{}",
+		"on-click": "kitty -e watch -n 1 sensors"
 	},
 
-	"temperature#gpu": {
+	"custom/temp-gpu": {
+		"exec": "$HOME/.config/waybar/scripts/temp.sh gpu",
+		"return-type": "json",
 		"interval": 2,
-		"hwmon-path-abs": "/sys/devices/pci0000:00/0000:00:01.1/0000:01:00.0/0000:02:00.0/0000:03:00.0/hwmon",
-		"input-filename": "temp1_input",
-		"critical-threshold": 90,
-		"format": "<span size='x-large'>󰢮</span>  {temperatureC}°",
-		"format-critical": "<span size='x-large' color='#dd532e'>󰢮</span> <span color='#dd532e'>{temperatureC}°</span>",
-		"tooltip-format": "dGPU edge (amdgpu)\t{temperatureC}°C / {temperatureF}°F"
+		"format": "{}",
+		"on-click": "kitty -e watch -n 1 sensors"
 	},
 
-	"temperature#gpu-mem": {
+	"custom/temp-gpu-mem": {
+		"exec": "$HOME/.config/waybar/scripts/temp.sh gpu-mem",
+		"return-type": "json",
 		"interval": 2,
-		"hwmon-path-abs": "/sys/devices/pci0000:00/0000:00:01.1/0000:01:00.0/0000:02:00.0/0000:03:00.0/hwmon",
-		"input-filename": "temp3_input",
-		"critical-threshold": 95,
-		"format": "<span size='x-large'>󰧶</span>  {temperatureC}°",
-		"format-critical": "<span size='x-large' color='#dd532e'>󰧶</span> <span color='#dd532e'>{temperatureC}°</span>",
-		"tooltip-format": "dGPU memory (VRAM)\t{temperatureC}°C / {temperatureF}°F"
+		"format": "{}",
+		"on-click": "kitty -e watch -n 1 sensors"
 	},
 
-	"temperature#igpu": {
+	"custom/temp-igpu": {
+		"exec": "$HOME/.config/waybar/scripts/temp.sh igpu",
+		"return-type": "json",
 		"interval": 5,
-		"hwmon-path-abs": "/sys/devices/pci0000:00/0000:00:08.1/0000:0e:00.0/hwmon",
-		"input-filename": "temp1_input",
-		"critical-threshold": 90,
-		"format": "<span size='x-large'>󰍛</span>  {temperatureC}°",
-		"format-critical": "<span size='x-large' color='#dd532e'>󰍛</span> <span color='#dd532e'>{temperatureC}°</span>",
-		"tooltip-format": "iGPU edge (APU)\t{temperatureC}°C / {temperatureF}°F"
+		"format": "{}",
+		"on-click": "kitty -e watch -n 1 sensors"
 	},
 
-	"temperature#nvme": {
+	"custom/temp-nvme": {
+		"exec": "$HOME/.config/waybar/scripts/temp.sh nvme",
+		"return-type": "json",
 		"interval": 5,
-		"hwmon-path-abs": "/sys/devices/pci0000:00/0000:00:01.2/0000:04:00.0/nvme/nvme0",
-		"input-filename": "temp1_input",
-		"critical-threshold": 75,
-		"format": "<span size='x-large'>󰋊</span>  {temperatureC}°",
-		"format-critical": "<span size='x-large' color='#dd532e'>󰋊</span> <span color='#dd532e'>{temperatureC}°</span>",
-		"tooltip-format": "NVMe Composite\t{temperatureC}°C / {temperatureF}°F"
+		"format": "{}",
+		"on-click": "kitty -e watch -n 1 sensors"
+	},
+
+	"custom/battery": {
+		"exec": "$HOME/.config/waybar/scripts/battery.sh",
+		"return-type": "json",
+		"interval": 10,
+		"format": "{}"
 	},
 
 	"clock#utc": {

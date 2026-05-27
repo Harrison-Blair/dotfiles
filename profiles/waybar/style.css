@@ -65,3 +65,19 @@ window#waybar.empty .modules-center{
 	padding: 0;
 	margin: 0;
 }
+
+/* Sensor + battery modules emit class="empty" when the underlying
+   /sys entry is not present on the current machine (e.g. NVIDIA dGPU
+   probe on the AMD desktop, or amdgpu probes on the Razer laptop, or
+   battery on the desktop). Collapse them so the bar doesn't leave a
+   visible gap where the module would be. */
+#custom-temp-cpu.empty,
+#custom-temp-gpu.empty,
+#custom-temp-gpu-mem.empty,
+#custom-temp-igpu.empty,
+#custom-temp-nvme.empty,
+#custom-battery.empty {
+	min-width: 0;
+	padding: 0;
+	margin: 0;
+}

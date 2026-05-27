@@ -79,6 +79,8 @@ def cmd_sync(_: argparse.Namespace) -> None:
         console.print("[yellow]Nothing selected; aborting.[/yellow]")
         return
 
+    subprocess.run(["git", "pull", "--rebase"], cwd=REPO_ROOT, check=True)
+
     PROFILES_DIR.mkdir(parents=True, exist_ok=True)
     for name in chosen:
         src = CONFIG_DIR / name
@@ -117,13 +119,23 @@ def apply_one(src: Path, name: str, ts: str) -> None:
     console.print(f"  applied [cyan]{name}[/cyan]")
 
 
-def cmd_apply(_: argparse.Namespace) -> None:
+def cmd_apply(args: argparse.Namespace) -> None:
     available = (
         sorted(p.name for p in PROFILES_DIR.iterdir() if p.is_dir())
         if PROFILES_DIR.exists()
         else []
     )
     backups = sorted(CONFIG_DIR.glob("*.bak-*"))
+
+    if args.names:
+        missing = [n for n in args.names if n not in available]
+        if missing:
+            console.print(f"[red]Not found in profiles/: {', '.join(missing)}[/red]")
+            return
+        ts = datetime.now().strftime("%Y%m%d-%H%M%S")
+        for name in args.names:
+            apply_one(PROFILES_DIR / name, name, ts)
+        return
 
     if not available and not backups:
         console.print("[red]No configs or backups found.[/red]")
@@ -181,7 +193,12 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("-v", "--verbose", action="store_true", help="enable verbose output")
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("sync", help="copy live configs into profiles/ and push")
-    sub.add_parser("apply", help="apply configs from profiles/ to ~/.config")
+    apply_parser = sub.add_parser("apply", help="apply configs from profiles/ to ~/.config")
+    apply_parser.add_argument(
+        "names",
+        nargs="*",
+        help="config names to apply non-interactively (e.g. waybar hypr)",
+    )
     sub.add_parser("clean-backups", help="list and delete *.bak-* in ~/.config")
     return parser.parse_args(argv)
 
