@@ -53,4 +53,13 @@ jobs:
             exit 0
           fi
           git commit -m "Build tui binary [skip ci]"
-          git push origin HEAD:main
+          for i in 1 2 3 4 5; do
+            if git push origin HEAD:main; then
+              exit 0
+            fi
+            echo "Push rejected, attempt $i — rebasing on origin/main and retrying"
+            git fetch origin main
+            git rebase origin/main
+          done
+          echo "Failed to push after 5 attempts"
+          exit 1
