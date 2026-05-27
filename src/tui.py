@@ -15,11 +15,18 @@ CONFIG_DIR = Path.home() / ".config"
 REPO_ROOT = (
     Path(sys.executable).resolve().parent
     if getattr(sys, "frozen", False)
-    else Path(__file__).resolve().parent
+    else Path(__file__).resolve().parent.parent
 )
 PROFILES_DIR = REPO_ROOT / "profiles"
 
 console = Console()
+
+
+def _remove(path: Path) -> None:
+    if path.is_dir() and not path.is_symlink():
+        shutil.rmtree(path)
+    elif path.exists() or path.is_symlink():
+        path.unlink()
 
 
 def select_configs(available: list[str], defaults: list[str]) -> list[str]:
@@ -50,8 +57,7 @@ def select_configs(available: list[str], defaults: list[str]) -> list[str]:
             chosen.append(available[idx])
         else:
             console.print(f"[red]Out of range: {part}[/red]")
-    seen: set[str] = set()
-    return [c for c in chosen if not (c in seen or seen.add(c))]
+    return list(dict.fromkeys(chosen))
 
 
 def list_config_subdirs() -> list[str]:
@@ -62,11 +68,7 @@ def list_config_subdirs() -> list[str]:
 
 
 def replace_tree(src: Path, dst: Path) -> None:
-    if dst.exists() or dst.is_symlink():
-        if dst.is_dir() and not dst.is_symlink():
-            shutil.rmtree(dst)
-        else:
-            dst.unlink()
+    _remove(dst)
     dst.parent.mkdir(parents=True, exist_ok=True)
     shutil.copytree(src, dst, symlinks=True)
 
@@ -92,9 +94,7 @@ def cmd_sync(_: argparse.Namespace) -> None:
 
     rel = PROFILES_DIR.relative_to(REPO_ROOT)
     subprocess.run(["git", "add", "-f", "--", str(rel)], cwd=REPO_ROOT, check=True)
-    staged = subprocess.run(
-        ["git", "diff", "--cached", "--quiet"], cwd=REPO_ROOT
-    )
+    staged = subprocess.run(["git", "diff", "--cached", "--quiet"], cwd=REPO_ROOT)
     if staged.returncode == 0:
         console.print("[yellow]No changes to commit.[/yellow]")
         return
@@ -120,19 +120,17 @@ def apply_one(src: Path, name: str, ts: str) -> None:
 
 
 def cmd_apply(args: argparse.Namespace) -> None:
-    available = (
-        sorted(p.name for p in PROFILES_DIR.iterdir() if p.is_dir())
-        if PROFILES_DIR.exists()
-        else []
-    )
+    available: list[str] = []
+    if PROFILES_DIR.exists():
+        available = sorted(p.name for p in PROFILES_DIR.iterdir() if p.is_dir())
     backups = sorted(CONFIG_DIR.glob("*.bak-*"))
+    ts = datetime.now().strftime("%Y%m%d-%H%M%S")
 
     if args.apply:
         missing = [n for n in args.apply if n not in available]
         if missing:
             console.print(f"[red]Not found in profiles/: {', '.join(missing)}[/red]")
             return
-        ts = datetime.now().strftime("%Y%m%d-%H%M%S")
         for name in args.apply:
             apply_one(PROFILES_DIR / name, name, ts)
         return
@@ -140,8 +138,6 @@ def cmd_apply(args: argparse.Namespace) -> None:
     if not available and not backups:
         console.print("[red]No configs or backups found.[/red]")
         return
-
-    ts = datetime.now().strftime("%Y%m%d-%H%M%S")
 
     if available:
         defaults = [n for n in available if n in DEFAULTS]
@@ -155,14 +151,10 @@ def cmd_apply(args: argparse.Namespace) -> None:
         console.print("[bold]Backups:[/bold]")
         for i, b in enumerate(backups, 1):
             console.print(f"  {i:>2}. {b.name}")
-        pick = Prompt.ask(
-            "Pick backup",
-            choices=[str(i) for i in range(1, len(backups) + 1)],
-            default="1",
-        )
+        choices = [str(i) for i in range(1, len(backups) + 1)]
+        pick = Prompt.ask("Pick backup", choices=choices, default="1")
         path = backups[int(pick) - 1]
-        original = path.name.split(".bak-", 1)[0]
-        apply_one(path, original, ts)
+        apply_one(path, path.name.split(".bak-", 1)[0], ts)
         return
 
     console.print("[yellow]Nothing selected.[/yellow]")
@@ -181,10 +173,7 @@ def cmd_clean_backups(_: argparse.Namespace) -> None:
         console.print("[yellow]Cancelled.[/yellow]")
         return
     for b in backups:
-        if b.is_dir() and not b.is_symlink():
-            shutil.rmtree(b)
-        else:
-            b.unlink()
+        _remove(b)
     console.print(f"[green]Deleted {len(backups)} backup(s).[/green]")
 
 
@@ -192,12 +181,9 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(prog="tui", description="dotfiles TUI")
     parser.add_argument("-v", "--verbose", action="store_true", help="enable verbose output")
     group = parser.add_mutually_exclusive_group(required=True)
-    group.add_argument("-s", "--sync", action="store_true",
-                       help="copy live configs into profiles/ and push")
-    group.add_argument("-a", "--apply", nargs="*", default=None, metavar="NAME",
-                       help="apply configs from profiles/ to ~/.config (optional names for non-interactive)")
-    group.add_argument("-c", "--clean-backups", action="store_true",
-                       help="list and delete *.bak-* in ~/.config")
+    group.add_argument("-s", "--sync", action="store_true", help="copy live configs into profiles/ and push")
+    group.add_argument("-a", "--apply", nargs="*", default=None, metavar="NAME", help="apply configs from profiles/ to ~/.config (optional names for non-interactive)")
+    group.add_argument("-c", "--clean-backups", action="store_true", help="list and delete *.bak-* in ~/.config")
     return parser.parse_args(argv)
 
 
