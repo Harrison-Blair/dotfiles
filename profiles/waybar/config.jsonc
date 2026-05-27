@@ -27,11 +27,11 @@
 		"custom/temp-gpu-mem",
 		"custom/temp-igpu",
 		"custom/temp-nvme",
-		"custom/battery",
 		"custom/sep",
 		"clock#utc",
 		"clock#local",
 		"custom/sep",
+		"custom/battery",
 		"custom/restart"
 	],
 	

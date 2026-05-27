@@ -85,7 +85,7 @@ probe_nvidia() {
 
 case "${1:-}" in
 	cpu)
-		probe_hwmon temp1_input "" 85 "CPU" \
+		probe_hwmon temp1_input "" 85 "CPU" \
 			"k10temp||" "coretemp||" "zenpower||"
 		empty
 		;;
