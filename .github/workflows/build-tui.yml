@@ -4,7 +4,8 @@ on:
   push:
     branches: [main]
     paths:
-      - 'tui.py'
+      - 'src/tui.py'
+      - 'src/tui.spec'
       - 'pyproject.toml'
       - '.github/workflows/build-tui.yml'
   workflow_dispatch:
@@ -36,7 +37,7 @@ jobs:
           pip install rich==15.0.0 pyinstaller
 
       - name: Build tui binary with PyInstaller
-        run: pyinstaller --onefile --name tui --console tui.py
+        run: pyinstaller --onefile --name tui --console src/tui.py
 
       - name: Move binary to repo root
         run: |
