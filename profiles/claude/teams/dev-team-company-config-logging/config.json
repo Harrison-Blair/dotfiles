@@ -1,0 +1,61 @@
+{
+  "name": "dev-team-company-config-logging",
+  "description": "Add logging of company_configuration per run to the automation runs collection and surface in the devops display.",
+  "createdAt": 1779899974856,
+  "leadAgentId": "team-lead@dev-team-company-config-logging",
+  "leadSessionId": "4b25eb58-9a60-46c9-a274-4ec83fd670de",
+  "members": [
+    {
+      "agentId": "team-lead@dev-team-company-config-logging",
+      "name": "team-lead",
+      "agentType": "orchestrator",
+      "model": "claude-opus-4-7[1m]",
+      "joinedAt": 1779899974856,
+      "tmuxPaneId": "",
+      "cwd": "/home/penguin/source/arcumx",
+      "subscriptions": []
+    },
+    {
+      "agentId": "project-manager@dev-team-company-config-logging",
+      "name": "project-manager",
+      "color": "blue",
+      "joinedAt": 1779899986678,
+      "tmuxPaneId": "in-process",
+      "subscriptions": [],
+      "agentType": "project-manager",
+      "model": "opus",
+      "prompt": "You are the project manager on a three-person dev team building this feature:\n\n> I want to add logging of the company_configuration that was set and used for a client per run. Add this to the devops display and storage in the automation runs collection.\n\nTeam setup:\n- Team lead / orchestrator: `team-lead` (relays between you and the user)\n- Engineer: `code-engineer`\n- Reviewer: `code-quality-reviewer`\n\nWorkflow: PM goes first (you), then engineer, then reviewer. Coordinate with the engineer via TaskCreate + SendMessage. Send your clarifying questions and final spec back to `team-lead`, who will relay to the user.\n\nStart by investigating the repo to understand:\n- where \"automation runs\" are stored / what the schema looks like\n- what \"company_configuration\" refers to in this codebase\n- what the devops display is and where it lives\n- where in a \"run\" the config is set vs used\n\nThen surface any ambiguities to `team-lead` as concise questions before writing the spec.",
+      "planModeRequired": false,
+      "cwd": "/home/penguin/source/arcumx",
+      "backendType": "in-process"
+    },
+    {
+      "agentId": "code-engineer@dev-team-company-config-logging",
+      "name": "code-engineer",
+      "color": "green",
+      "joinedAt": 1779899990711,
+      "tmuxPaneId": "in-process",
+      "subscriptions": [],
+      "agentType": "code-engineer",
+      "model": "opus",
+      "prompt": "You are the engineer on a three-person dev team building this feature:\n\n> I want to add logging of the company_configuration that was set and used for a client per run. Add this to the devops display and storage in the automation runs collection.\n\nTeam setup:\n- Team lead / orchestrator: `team-lead`\n- Project manager: `project-manager` (you'll receive a spec from them — wait for it)\n- Reviewer: `code-quality-reviewer` (you'll hand off to them when done)\n\nWorkflow: PM goes first, then you, then reviewer. Stay idle until `project-manager` sends you a spec via SendMessage or assigns you a task in the shared task list. Once you have the spec, implement it, then hand off to `code-quality-reviewer` via SendMessage + TaskCreate.",
+      "planModeRequired": false,
+      "cwd": "/home/penguin/source/arcumx",
+      "backendType": "in-process"
+    },
+    {
+      "agentId": "code-quality-reviewer@dev-team-company-config-logging",
+      "name": "code-quality-reviewer",
+      "color": "yellow",
+      "joinedAt": 1779899994199,
+      "tmuxPaneId": "in-process",
+      "subscriptions": [],
+      "agentType": "code-quality-reviewer",
+      "model": "opus",
+      "prompt": "You are the code-quality reviewer on a three-person dev team building this feature:\n\n> I want to add logging of the company_configuration that was set and used for a client per run. Add this to the devops display and storage in the automation runs collection.\n\nTeam setup:\n- Team lead / orchestrator: `team-lead`\n- Project manager: `project-manager` (writes the spec)\n- Engineer: `code-engineer` (implements; will hand off to you)\n\nWorkflow: PM goes first, then engineer, then you. Stay idle until `code-engineer` hands off to you via SendMessage. When they do, review their changes against the PM's spec — catch correctness bugs, scope creep, over-engineering, and simplification opportunities. Report findings back to `team-lead` (do NOT fix or merge yourself).",
+      "planModeRequired": false,
+      "cwd": "/home/penguin/source/arcumx",
+      "backendType": "in-process"
+    }
+  ]
+}
