@@ -22,11 +22,7 @@
 		"memory",
 		"cpu",
 		"custom/sep",
-		"custom/temp-cpu",
-		"custom/temp-gpu",
-		"custom/temp-gpu-mem",
-		"custom/temp-igpu",
-		"custom/temp-nvme",
+		"custom/sensors",
 		"custom/sep",
 		"clock#utc",
 		"clock#local",
@@ -97,59 +93,22 @@
 		"on-click": "kitty -e htop"
 	},
 	/////////////////////////////////////////////////////////////////////
-	/// Temperature + Battery Modules                                 ///
+	/// Sensors + Battery Modules                                     ///
 	/////////////////////////////////////////////////////////////////////
-	// Sensors are resolved by chip name (k10temp / coretemp / amdgpu /
-	// nvme / i915 / nvidia) inside scripts/temp.sh, so this config is
-	// portable across machines without baking in PCI paths. Each module
-	// key (cpu, gpu, gpu-mem, igpu, nvme) maps to a case in the script
-	// which tries chips in order and emits an empty payload with class
-	// "empty" when none are present. The "empty" CSS class in style.css
-	// collapses the widget so missing sensors don't leave visible gaps.
+	// scripts/sensors.sh enumerates every /sys/class/hwmon temp + nvidia-smi
+	// at runtime, so the same config works on the AMD desktop and on the
+	// Razer Blade 15 (Intel + NVIDIA + Intel iGPU) without configuration.
+	// Bar shows icon + CPU temp; hover tooltip shows the full sensor list.
 	//
-	// Likewise scripts/battery.sh reads /sys/class/power_supply/BAT* and
-	// emits empty on machines without a battery (the desktop).
-	//
-	// To add a new sensor: add a case in scripts/temp.sh, then a module
-	// here. To see what a new machine exposes, run:   sensors
+	// scripts/battery.sh reads /sys/class/power_supply/BAT* and emits empty
+	// on machines without a battery (the desktop).
 
-	"custom/temp-cpu": {
-		"exec": "$HOME/.config/waybar/scripts/temp.sh cpu",
+	"custom/sensors": {
+		"exec": "$HOME/.config/waybar/scripts/sensors.sh",
 		"return-type": "json",
 		"interval": 2,
 		"format": "{}",
-		"on-click": "kitty -e watch -n 1 sensors"
-	},
-
-	"custom/temp-gpu": {
-		"exec": "$HOME/.config/waybar/scripts/temp.sh gpu",
-		"return-type": "json",
-		"interval": 2,
-		"format": "{}",
-		"on-click": "kitty -e watch -n 1 sensors"
-	},
-
-	"custom/temp-gpu-mem": {
-		"exec": "$HOME/.config/waybar/scripts/temp.sh gpu-mem",
-		"return-type": "json",
-		"interval": 2,
-		"format": "{}",
-		"on-click": "kitty -e watch -n 1 sensors"
-	},
-
-	"custom/temp-igpu": {
-		"exec": "$HOME/.config/waybar/scripts/temp.sh igpu",
-		"return-type": "json",
-		"interval": 5,
-		"format": "{}",
-		"on-click": "kitty -e watch -n 1 sensors"
-	},
-
-	"custom/temp-nvme": {
-		"exec": "$HOME/.config/waybar/scripts/temp.sh nvme",
-		"return-type": "json",
-		"interval": 5,
-		"format": "{}",
+		"tooltip": true,
 		"on-click": "kitty -e watch -n 1 sensors"
 	},
 
