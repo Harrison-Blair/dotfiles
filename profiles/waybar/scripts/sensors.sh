@@ -244,13 +244,14 @@ for i in "${!group_headers[@]}"; do
 	mapfile -t crits_arr     <<< "${group_crits[$i]}"
 	mapfile -t row_icons_arr <<< "${group_row_icons[$i]}"
 
-	# Find max label width within this group (cap at 12).
+	# Find max label width within this group (min 18 for wider tooltip, cap at 24).
 	maxw=0
 	for lbl in "${labels_arr[@]}"; do
 		w=${#lbl}
 		(( w > maxw )) && maxw=$w
 	done
-	(( maxw > 12 )) && maxw=12
+	(( maxw < 18 )) && maxw=18
+	(( maxw > 24 )) && maxw=24
 
 	[[ -n "$tooltip" ]] && tooltip+=$'\n'
 	if [[ -n "$header_icon" ]]; then

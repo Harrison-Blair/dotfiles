@@ -1,0 +1,26 @@
+[
+  {
+    "from": "team-lead",
+    "text": "Please start requirements work on this feature:\n\n> I want to add logging of the company_configuration that was set and used for a client per run. Add this to the devops display and storage in the automation runs collection.\n\nThe user just added this clarification — treat it as authoritative:\n\n> \"I am thinking like a button is shown on the top but next to each run and it will store it every time when we kick off a run. So we know what are all the config comes with that run no matter how people updating the config afterwards.\"\n\nKey takeaways from the clarification:\n1. **Snapshot semantics** — capture the company_configuration *at the moment the run is kicked off*. It must be immutable thereafter, even if someone edits the company_configuration later. The whole point is to know exactly which config was used for any historical run.\n2. **Storage** — persist the snapshot on the automation runs collection record.\n3. **Devops UI** — add a button next to each run (the user said \"on the top but next to each run\") that surfaces the captured config for that run. Decide whether that means a modal, drawer, expand, or a dedicated page — propose what fits the existing devops display patterns.\n\nPlease investigate the repo first (automation runs collection schema, where runs are kicked off, what `company_configuration` actually is, and the devops display layout), then send me (`team-lead`) any clarifying questions before writing the spec. I'll relay to the user. Once the spec is solid, hand off to `code-engineer`.",
+    "summary": "Kick off — spec the company_config-per-run feature",
+    "timestamp": "2026-05-27T16:40:11.880Z",
+    "type": "message",
+    "read": true
+  },
+  {
+    "from": "team-lead",
+    "text": "User answered your \"set and used\" question:\n\n> **Config + per-run overrides** — also capture CLI flags, env-var overrides, and per-run params like `start_from_step` — anything that actually changed behavior for this run, not just the base company_configuration doc.\n\nPlease update the spec accordingly:\n- Snapshot is no longer just `container.raw_config` — it needs to include whatever overrides/parameters the run was invoked with.\n- Investigate what those override surfaces actually are in this codebase (CLI args, env vars read during run setup, per-run params on the pipeline orchestrator, anything else that mutates effective config between \"the doc in Mongo\" and \"what the run actually executed against\").\n- The stored shape should make it clear what came from the base config vs. what was overridden — propose a structure (e.g. `{company_configuration: {...}, overrides: {...}}` or similar) so a user looking at the dialog can see both.\n- Update the View Config dialog spec so the overrides are visible alongside the base config.\n- The immutability and \"snapshot at kickoff\" semantics stay the same.\n\nPlease push the updated spec to `code-engineer` (they may have started — coordinate with them on Task #1 so they don't redo work that's still valid). Ping me when the engineer has the revised spec.",
+    "summary": "User: include per-run overrides too",
+    "timestamp": "2026-05-27T16:43:51.030Z",
+    "type": "message",
+    "read": true
+  },
+  {
+    "from": "team-lead",
+    "text": "User confirmed both calls — no spec changes needed:\n\n1. **Secrets stay excluded** — keep infra creds (`MONGODB_*_URI`, `PAYROC_PRIVATE_KEY_PEM`, etc.) out of the snapshot.\n2. **The 4 overrides are the right set** — `ONLY_STEP`, `STOP_AFTER_STEP`, `ONLY_SCRIPT`, `PRESERVE_PREDICTIONS`. No additions.\n\nEngineer can proceed as-is on Task #1. Ping me when the reviewer has reported.",
+    "summary": "User confirmed — secrets out, 4 overrides good",
+    "timestamp": "2026-05-27T16:46:59.885Z",
+    "type": "message",
+    "read": true
+  }
+]
