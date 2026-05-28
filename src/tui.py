@@ -10,8 +10,18 @@ from pathlib import Path
 from rich.console import Console
 from rich.prompt import Confirm, Prompt
 
-DEFAULTS = ["waybar", "hypr", "kitty", "rofi"]
+DEFAULTS = ["waybar", "hypr", "kitty", "rofi", "claude"]
 CONFIG_DIR = Path.home() / ".config"
+CLAUDE_DIR = Path.home() / ".claude"
+CLAUDE_INCLUDES = [
+    "agents",
+    "commands",
+    "teams",
+    "plugins",
+    "CLAUDE.md",
+    "settings.json",
+    "statusline-command.sh",
+]
 REPO_ROOT = (
     Path(sys.executable).resolve().parent
     if getattr(sys, "frozen", False)
@@ -62,9 +72,25 @@ def select_configs(available: list[str], defaults: list[str]) -> list[str]:
 
 def list_config_subdirs() -> list[str]:
     names = [p.name for p in CONFIG_DIR.iterdir() if p.is_dir() and not p.name.startswith(".")]
+    if CLAUDE_DIR.is_dir():
+        names.append("claude")
     head = [n for n in DEFAULTS if n in names]
     tail = sorted(n for n in names if n not in DEFAULTS)
     return head + tail
+
+
+def sync_claude(dst: Path) -> None:
+    _remove(dst)
+    dst.mkdir(parents=True, exist_ok=True)
+    for entry in CLAUDE_INCLUDES:
+        src = CLAUDE_DIR / entry
+        if not src.exists():
+            continue
+        target = dst / entry
+        if src.is_dir() and not src.is_symlink():
+            shutil.copytree(src, target, symlinks=True)
+        else:
+            shutil.copy2(src, target, follow_symlinks=False)
 
 
 def replace_tree(src: Path, dst: Path) -> None:
@@ -85,6 +111,13 @@ def cmd_sync(_: argparse.Namespace) -> None:
 
     PROFILES_DIR.mkdir(parents=True, exist_ok=True)
     for name in chosen:
+        if name == "claude":
+            if not CLAUDE_DIR.exists():
+                console.print(f"[red]Missing {CLAUDE_DIR}, skipping.[/red]")
+                continue
+            sync_claude(PROFILES_DIR / "claude")
+            console.print("  copied [cyan]claude[/cyan]")
+            continue
         src = CONFIG_DIR / name
         if not src.exists():
             console.print(f"[red]Missing {src}, skipping.[/red]")
@@ -106,8 +139,8 @@ def cmd_sync(_: argparse.Namespace) -> None:
     console.print(f"[green]Synced:[/green] {msg}")
 
 
-def apply_one(src: Path, name: str, ts: str) -> None:
-    dst = CONFIG_DIR / name
+def apply_one(src: Path, name: str, ts: str, base: Path = CONFIG_DIR) -> None:
+    dst = base / name
     if dst.exists() or dst.is_symlink():
         bak = dst.with_name(f"{name}.bak-{ts}")
         dst.rename(bak)
@@ -117,6 +150,12 @@ def apply_one(src: Path, name: str, ts: str) -> None:
     else:
         shutil.copy2(src, dst, follow_symlinks=False)
     console.print(f"  applied [cyan]{name}[/cyan]")
+
+
+def apply_claude(src_dir: Path, ts: str) -> None:
+    CLAUDE_DIR.mkdir(parents=True, exist_ok=True)
+    for entry in sorted(src_dir.iterdir()):
+        apply_one(entry, entry.name, ts, base=CLAUDE_DIR)
 
 
 def cmd_apply(args: argparse.Namespace) -> None:
@@ -132,7 +171,10 @@ def cmd_apply(args: argparse.Namespace) -> None:
             console.print(f"[red]Not found in profiles/: {', '.join(missing)}[/red]")
             return
         for name in args.apply:
-            apply_one(PROFILES_DIR / name, name, ts)
+            if name == "claude":
+                apply_claude(PROFILES_DIR / "claude", ts)
+            else:
+                apply_one(PROFILES_DIR / name, name, ts)
         return
 
     if not available and not backups:
@@ -144,7 +186,10 @@ def cmd_apply(args: argparse.Namespace) -> None:
         chosen = select_configs(available, defaults)
         if chosen:
             for name in chosen:
-                apply_one(PROFILES_DIR / name, name, ts)
+                if name == "claude":
+                    apply_claude(PROFILES_DIR / "claude", ts)
+                else:
+                    apply_one(PROFILES_DIR / name, name, ts)
             return
 
     if backups:
