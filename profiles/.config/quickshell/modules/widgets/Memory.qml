@@ -18,6 +18,15 @@ Item {
     property real swapTotalGb: 0
     property int swapPercent: 0
 
+    // Reserve width for the widest value ("00.00G") so the widget — and thus the
+    // whole centered bar — doesn't shift when used RAM crosses 10 GB.
+    TextMetrics {
+        id: memMetrics
+        font.family: Theme.fontFamily
+        font.pixelSize: Theme.fontSize
+        text: "00.00G"
+    }
+
     function parse(t) {
         function get(k) {
             const m = t.match(new RegExp("^" + k + ":\\s+(\\d+)", "m"))
@@ -58,11 +67,22 @@ Item {
             Layout.leftMargin: 2
             Layout.rightMargin: 2
         }
-        Text {
-            text: root.usedGb.toFixed(2) + "G"
-            color: Theme.fg
-            font.family: Theme.fontFamily
-            font.pixelSize: Theme.fontSize
+        // Fixed-width box so the label ("6.42G" → "12.34G") never changes the
+        // module's width. RowLayout honors this Item's implicitWidth.
+        Item {
+            implicitWidth: memMetrics.width
+            implicitHeight: memText.implicitHeight
+            Layout.alignment: Qt.AlignVCenter
+            Text {
+                id: memText
+                anchors.fill: parent
+                text: root.usedGb.toFixed(2) + "G"
+                color: Theme.fg
+                font.family: Theme.fontFamily
+                font.pixelSize: Theme.fontSize
+                horizontalAlignment: Text.AlignRight
+                verticalAlignment: Text.AlignVCenter
+            }
         }
     }
 
@@ -70,7 +90,8 @@ Item {
         anchors.fill: parent
         hoverEnabled: true
         cursorShape: Qt.PointingHandCursor
-        onClicked: menu.visible = !menu.visible
+        onEntered: menu.anchorHovered = true
+        onExited: menu.anchorHovered = false
     }
 
     PopupMenu {

@@ -58,7 +58,8 @@ Item {
         anchors.fill: parent
         hoverEnabled: true
         cursorShape: Qt.PointingHandCursor
-        onClicked: menu.visible = !menu.visible
+        onEntered: menu.anchorHovered = true
+        onExited: menu.anchorHovered = false
     }
 
     PopupMenu {

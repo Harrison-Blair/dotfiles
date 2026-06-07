@@ -3,13 +3,27 @@ import QtQuick
 import QtQuick.Layouts
 import qs.services
 
-// Reusable click-activated menu (replaces waybar hover tooltips). A module sets
-// `anchorItem` to its own root Item and toggles `visible`. Clicking outside
-// dismisses it via grabFocus.
+// Reusable hover-activated tooltip/menu. A module sets `anchorItem` to its own
+// root Item and drives `anchorHovered` from its MouseArea's onEntered/onExited.
+// The popup stays open while the cursor is over the widget OR the popup itself
+// (tracked via HoverHandler), so action buttons inside remain clickable. A short
+// close delay bridges the gap between the bar widget and the popup.
 PopupWindow {
     id: popup
     property Item anchorItem
+    property bool anchorHovered: false
     default property alias content: inner.data
+
+    // Open while hovering either the source widget or the popup body.
+    readonly property bool keepOpen: anchorHovered || frameHover.hovered
+    onKeepOpenChanged: {
+        if (keepOpen) {
+            closeTimer.stop()
+            visible = true
+        } else {
+            closeTimer.restart()
+        }
+    }
 
     anchor.item: anchorItem
     anchor.edges: Edges.Bottom
@@ -20,7 +34,12 @@ PopupWindow {
     implicitHeight: frame.implicitHeight
     color: "transparent"
     visible: false
-    grabFocus: visible
+
+    Timer {
+        id: closeTimer
+        interval: 250
+        onTriggered: if (!popup.keepOpen) popup.visible = false
+    }
 
     Rectangle {
         id: frame
@@ -31,6 +50,9 @@ PopupWindow {
         border.width: 1
         border.color: Theme.border
         radius: 10
+
+        // Tracks hover over the popup body without intercepting button clicks.
+        HoverHandler { id: frameHover }
 
         ColumnLayout {
             id: inner

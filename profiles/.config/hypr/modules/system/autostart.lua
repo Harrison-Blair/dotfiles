@@ -18,11 +18,8 @@ hl.on("hyprland.start", function ()
     hl.exec_cmd("systemctl --user start hyprpolkitagent")
 
     hl.exec_cmd("qs -d")
-    hl.exec_cmd("waypaper --restore")
     hl.exec_cmd("wl-paste --watch clipvault store")
 
     hl.exec_cmd("gsettings set org.gnome.desktop.interface color-scheme \"prefer-dark\"")
     hl.exec_cmd("gsettings set org.gnome.desktop.interface gtk-theme \"adw-gtk3\"")
-
-    hl.exec_cmd(os.getenv("HOME") .. "/.config/hypr/scripts/hyprlock-launch.sh")
 end)

@@ -15,7 +15,6 @@ hl.bind(mainMod .. " + V", hl.dsp.exec_cmd(string.format("clipvault list | %s -d
 hl.bind(mainMod .. " + D", hl.dsp.exec_cmd(string.format("%s -show run", menu)))
 hl.bind(mainMod .. " + P", hl.dsp.window.pseudo())
 hl.bind(mainMod .. " + J", hl.dsp.layout("togglesplit"))    -- dwindle only
-hl.bind(mainMod .. " + L", hl.dsp.exec_cmd("hyprlock"))
 
 -- Move focus with mainMod + arrow keys
 hl.bind(mainMod .. " + left",  hl.dsp.focus({ direction = "left" }))

@@ -69,6 +69,7 @@ Singleton {
     readonly property string icoMem: String.fromCodePoint(0xEFC5)
     readonly property string icoCpu: String.fromCodePoint(0xF4BC)
     readonly property string icoReload: String.fromCodePoint(0xF00E2)
+    readonly property string icoScreenshot: String.fromCodePoint(0xF0100)  // md camera
 
     // sensors (scripts/sensors.sh)
     readonly property string icoSensCpu:    String.fromCodePoint(0xF4BC)

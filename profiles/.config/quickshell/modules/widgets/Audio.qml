@@ -20,6 +20,15 @@ Item {
     // Required for sink.audio.{volume,muted} to stay live.
     PwObjectTracker { objects: [Pipewire.defaultAudioSink] }
 
+    // Reserve width for the widest label ("100%"/"Mute") so the widget — and
+    // thus the whole centered bar — doesn't shift as the volume changes.
+    TextMetrics {
+        id: volMetrics
+        font.family: Theme.fontFamily
+        font.pixelSize: Theme.fontSize
+        text: "100%"
+    }
+
     function volIcon() {
         if (root.muted) return Theme.icoVolMute
         if (root.volume <= 0) return Theme.icoVolLow
@@ -31,11 +40,22 @@ Item {
         id: row
         anchors.centerIn: parent
         spacing: 6
-        Text {
-            text: root.muted ? "Mute" : (root.volume + "%")
-            color: Theme.fg
-            font.family: Theme.fontFamily
-            font.pixelSize: Theme.fontSize
+        // Fixed-width box so the label ("5%" → "100%" → "Mute") never changes
+        // the module's width. RowLayout honors this Item's implicitWidth.
+        Item {
+            implicitWidth: volMetrics.width
+            implicitHeight: volText.implicitHeight
+            Layout.alignment: Qt.AlignVCenter
+            Text {
+                id: volText
+                anchors.fill: parent
+                text: root.muted ? "Mute" : (root.volume + "%")
+                color: Theme.fg
+                font.family: Theme.fontFamily
+                font.pixelSize: Theme.fontSize
+                horizontalAlignment: Text.AlignRight
+                verticalAlignment: Text.AlignVCenter
+            }
         }
         Icon {
             text: root.volIcon()
@@ -46,7 +66,8 @@ Item {
         anchors.fill: parent
         hoverEnabled: true
         cursorShape: Qt.PointingHandCursor
-        onClicked: menu.visible = !menu.visible
+        onEntered: menu.anchorHovered = true
+        onExited: menu.anchorHovered = false
     }
 
     PopupMenu {
@@ -54,7 +75,7 @@ Item {
         anchorItem: root
         Text {
             text: (root.ready && root.sink.description ? root.sink.description : "Audio")
-                  + "\n" + (root.muted ? "Muted" : root.volume + "%")
+                  + ": " + (root.muted ? "Muted" : root.volume + "%")
             color: Theme.fg
             font.family: Theme.fontFamily
             font.pixelSize: Theme.fontSize - 1

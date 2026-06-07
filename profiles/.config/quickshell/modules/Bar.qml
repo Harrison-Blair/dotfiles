@@ -37,5 +37,7 @@ PanelWindow {
         Temperature {}
         Separator { visible: battery.present }
         Battery { id: battery }
+        Separator {}
+        Screenshot {}
     }
 }
