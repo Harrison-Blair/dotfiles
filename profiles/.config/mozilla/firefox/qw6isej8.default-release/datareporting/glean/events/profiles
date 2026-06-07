@@ -517,3 +517,6 @@
 {"timestamp":63459,"category":"glean","name":"restarted","extra":{"glean.startup.date":"2026-06-06T09:41-04:00","glean_timestamp":"1780753265426"},"execution_counter":60}
 {"timestamp":1207658,"category":"glean","name":"restarted","extra":{"glean_timestamp":"1780754409625","glean.startup.date":"2026-06-06T10:00-04:00"},"execution_counter":61}
 {"timestamp":61789,"category":"glean","name":"restarted","extra":{"glean.startup.date":"2026-06-06T21:43-04:00","glean_timestamp":"1780796619830"},"execution_counter":62}
+{"timestamp":7364443,"category":"glean","name":"restarted","extra":{"glean_timestamp":"1780803922485","glean.startup.date":"2026-06-06T23:45-04:00"},"execution_counter":63}
+{"timestamp":159318,"category":"glean","name":"restarted","extra":{"glean_timestamp":"1780851853326","glean.startup.date":"2026-06-07T13:04-04:00"},"execution_counter":64}
+{"timestamp":4815224,"category":"glean","name":"restarted","extra":{"glean_timestamp":"1780856509232","glean.startup.date":"2026-06-07T14:21-04:00"},"execution_counter":65}

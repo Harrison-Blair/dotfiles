@@ -1,0 +1,4 @@
+{"timestamp":7264690,"category":"bounce.tracking.protection","name":"purge_action","extra":{"success":"true","glean_timestamp":"1780803822731","site_host":"amzn.to","is_dry_run":"true","bounce_time":"1780798817"},"execution_counter":28}
+{"timestamp":7364443,"category":"glean","name":"restarted","extra":{"glean_timestamp":"1780803922485","glean.startup.date":"2026-06-06T23:45-04:00"},"execution_counter":29}
+{"timestamp":159318,"category":"glean","name":"restarted","extra":{"glean_timestamp":"1780851853326","glean.startup.date":"2026-06-07T13:04-04:00"},"execution_counter":30}
+{"timestamp":4815224,"category":"glean","name":"restarted","extra":{"glean_timestamp":"1780856509232","glean.startup.date":"2026-06-07T14:21-04:00"},"execution_counter":31}

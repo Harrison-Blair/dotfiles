@@ -25,9 +25,6 @@ Item {
         const d = root.now
         return "UTC " + pad(d.getUTCHours()) + ":" + pad(d.getUTCMinutes()) + ":" + pad(d.getUTCSeconds())
     }
-    function localDate() {
-        return Qt.formatDateTime(root.now, "yyyy-MM-dd")
-    }
     function localTime() {
         return "EST " + Qt.formatDateTime(root.now, "HH:mm:ss")
     }
@@ -43,12 +40,6 @@ Item {
         id: row
         anchors.centerIn: parent
         spacing: 16
-        Text {
-            text: root.localDate()
-            color: Theme.fg
-            font.family: Theme.fontFamily
-            font.pixelSize: Theme.fontSize
-        }
         Text {
             text: root.localTime()
             color: Theme.fg
