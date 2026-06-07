@@ -1,6 +1,7 @@
 import argparse
 import json
 import os
+import re
 import select
 import shutil
 import socket
@@ -155,6 +156,24 @@ def effective_selection(nodes: list[Node]) -> list[str]:
     return keys
 
 
+def last_sync_info(key: str) -> str:
+    """Human-readable 'last synced' line for a profiles/ folder, from git history."""
+    rel = (PROFILES_DIR / key).relative_to(REPO_ROOT)
+    out = subprocess.run(
+        ["git", "log", "-1", "--format=%cI%x00%s", "--", str(rel)],
+        cwd=REPO_ROOT, capture_output=True, text=True,
+    ).stdout.strip()
+    if not out:
+        return "untracked / never synced"
+    date_iso, _, subject = out.partition("\x00")
+    when = date_iso[:16].replace("T", " ")  # 2026-06-07 19:32
+    m = re.search(r"Sync from (\S+) .* by (\S+)", subject)
+    if m:
+        host, user = m.group(1), m.group(2)
+        return f"last sync {when} from {host} by {user}"
+    return f"last commit {when}"
+
+
 # --- interactive selection (Rich Live + raw key input) ----------------------
 
 
@@ -211,10 +230,13 @@ def _key_loop(render, on_key) -> bool:
         termios.tcsetattr(fd, termios.TCSADRAIN, old)
 
 
-def _render_checklist(nodes: list[Node], cursor: int, title: str) -> Text:
+def _render_checklist(
+    nodes: list[Node], cursor: int, title: str, info: dict[str, str] | None = None
+) -> Text:
     whole = _config_whole(nodes)
     text = Text()
     text.append(title + "\n", style="bold")
+    text.append("-" * 45 + "\n\n", style="dim")
     for i, n in enumerate(nodes):
         implied = n.parent_key == ".config" and whole
         glyph = "[-]" if implied else ("[x]" if n.checked else "[ ]")
@@ -223,7 +245,10 @@ def _render_checklist(nodes: list[Node], cursor: int, title: str) -> Text:
             label = f"{label}  (whole folder)"
         pointer = ">" if i == cursor else " "
         style = "reverse" if i == cursor else ("dim" if implied else "")
-        text.append(f"{pointer} {'  ' * n.depth}{glyph} {label}\n", style=style)
+        text.append(f"{pointer} {'  ' * n.depth}{glyph} {label}", style=style)
+        if info and n.key in info:
+            text.append(f"  — {info[n.key]}", style="dim")
+        text.append("\n")
     text.append(
         "\n↑/↓ move · space toggle · enter confirm · q cancel",
         style="dim",
@@ -238,7 +263,9 @@ def _toggle(nodes: list[Node], idx: int) -> None:
     n.checked = not n.checked
 
 
-def interactive_select(nodes: list[Node], title: str) -> list[Node] | None:
+def interactive_select(
+    nodes: list[Node], title: str, info: dict[str, str] | None = None
+) -> list[Node] | None:
     if not nodes:
         return []
     state = {"cursor": 0}
@@ -257,7 +284,7 @@ def interactive_select(nodes: list[Node], title: str) -> list[Node] | None:
         return None
 
     confirmed = _key_loop(
-        lambda: _render_checklist(nodes, state["cursor"], title), on_key
+        lambda: _render_checklist(nodes, state["cursor"], title, info), on_key
     )
     return nodes if confirmed else None
 
@@ -268,6 +295,7 @@ def menu_select(title: str, options: list[tuple[str, str]]) -> str | None:
     def render() -> Text:
         text = Text()
         text.append(title + "\n", style="bold")
+        text.append("-" * 45 + "\n\n", style="dim")
         for i, (_, label) in enumerate(options):
             pointer = ">" if i == state["cursor"] else " "
             style = "reverse" if i == state["cursor"] else ""
@@ -457,13 +485,59 @@ def cmd_clean_backups(_: argparse.Namespace) -> None:
     console.print(f"[green]Deleted {len(backups)} backup(s).[/green]")
 
 
+def cmd_clean_profile(_: argparse.Namespace) -> None:
+    hostname = socket.gethostname()
+    ignore = load_ignore()
+    nodes = build_apply_tree(ignore)
+    if not nodes:
+        console.print("[yellow]Profile is empty; nothing to clean.[/yellow]")
+        return
+    info = {n.key: last_sync_info(n.key) for n in nodes}
+    result = interactive_select(nodes, "Clean profile (delete from profiles/)", info=info)
+    if result is None:
+        if not (sys.stdin.isatty() and sys.stdout.isatty()):
+            console.print("[red]Clean profile requires an interactive terminal.[/red]")
+        else:
+            console.print("[yellow]Cancelled.[/yellow]")
+        return
+    keys = effective_selection(result)
+    if not keys:
+        console.print("[yellow]Nothing selected; aborting.[/yellow]")
+        return
+
+    console.print("[bold red]Will delete from profiles/:[/bold red]")
+    for k in keys:
+        console.print(f"  [red]{k}[/red]  [dim]({info.get(k, '')})[/dim]")
+    if not Confirm.ask("Delete these from the profile?", default=False):
+        console.print("[yellow]Cancelled.[/yellow]")
+        return
+
+    subprocess.run(["git", "pull", "--rebase"], cwd=REPO_ROOT, check=True)
+    for key in keys:
+        _remove(PROFILES_DIR / key)
+        console.print(f"  removed [cyan]{key}[/cyan]")
+
+    rel = PROFILES_DIR.relative_to(REPO_ROOT)
+    subprocess.run(["git", "add", "-f", "--", str(rel)], cwd=REPO_ROOT, check=True)
+    staged = subprocess.run(["git", "diff", "--cached", "--quiet"], cwd=REPO_ROOT)
+    if staged.returncode == 0:
+        console.print("[yellow]No changes to commit.[/yellow]")
+        return
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    msg = f"Clean profile from {hostname} at {now} by {getuser()}: {', '.join(keys)}"
+    subprocess.run(["git", "commit", "-m", msg], cwd=REPO_ROOT, check=True)
+    subprocess.run(["git", "push"], cwd=REPO_ROOT, check=True)
+    console.print(f"[green]Cleaned:[/green] {msg}")
+
+
 def run_menu(args: argparse.Namespace) -> None:
     if not (sys.stdin.isatty() and sys.stdout.isatty()):
-        console.print("Usage: tui [-s | -a [NAME...] | -c]")
+        console.print("Usage: tui [-s | -a [NAME...] | -c | -P]")
         sys.exit(2)
     options = [
         ("sync", "Sync to cloud"),
         ("apply", "Apply from profiles"),
+        ("clean-profile", "Clean profile"),
         ("clean", "Clean backups"),
         ("quit", "Quit"),
     ]
@@ -472,6 +546,8 @@ def run_menu(args: argparse.Namespace) -> None:
         cmd_sync(args)
     elif choice == "apply":
         cmd_apply(args)
+    elif choice == "clean-profile":
+        cmd_clean_profile(args)
     elif choice == "clean":
         cmd_clean_backups(args)
 
@@ -483,6 +559,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     group.add_argument("-s", "--sync", action="store_true", help="copy live configs into profiles/ and push")
     group.add_argument("-a", "--apply", nargs="*", default=None, metavar="NAME", help="apply configs from profiles/ to ~ (optional home-relative names for non-interactive)")
     group.add_argument("-c", "--clean-backups", action="store_true", help="list and delete *.bak-* in ~ and ~/.config")
+    group.add_argument("-P", "--clean-profile", action="store_true", help="delete folders from profiles/ and push")
     return parser.parse_args(argv)
 
 
@@ -494,6 +571,8 @@ def main(argv: list[str] | None = None) -> None:
         cmd_apply(args)
     elif args.clean_backups:
         cmd_clean_backups(args)
+    elif args.clean_profile:
+        cmd_clean_profile(args)
     else:
         run_menu(args)
 
