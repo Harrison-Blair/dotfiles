@@ -294,7 +294,10 @@ def menu_select(title: str, options: list[tuple[str, str]]) -> str | None:
 
     def render() -> Text:
         text = Text()
-        text.append(title + "\n", style="bold")
+        text.append("-" * 45 + "\n", style="dim")
+        text.append("---- ", style="dim")
+        text.append(f"{title:^35}", style="bold")
+        text.append(" ----\n", style="dim")
         text.append("-" * 45 + "\n\n", style="dim")
         for i, (_, label) in enumerate(options):
             pointer = ">" if i == state["cursor"] else " "
