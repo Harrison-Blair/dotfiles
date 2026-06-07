@@ -230,13 +230,29 @@ def _key_loop(render, on_key) -> bool:
         termios.tcsetattr(fd, termios.TCSADRAIN, old)
 
 
+def _box_header(title: str, description: str | None = None) -> Text:
+    """A 45-wide boxed title; optional italic description below, then a blank line."""
+    text = Text()
+    text.append("-" * 45 + "\n", style="dim")
+    text.append("---- ", style="dim")
+    text.append(f"{title:^35}", style="bold")
+    text.append(" ----\n", style="dim")
+    text.append("-" * 45 + "\n", style="dim")
+    if description:
+        text.append(description + "\n", style="italic")
+    text.append("\n")
+    return text
+
+
 def _render_checklist(
-    nodes: list[Node], cursor: int, title: str, info: dict[str, str] | None = None
+    nodes: list[Node],
+    cursor: int,
+    title: str,
+    info: dict[str, str] | None = None,
+    description: str | None = None,
 ) -> Text:
     whole = _config_whole(nodes)
-    text = Text()
-    text.append(title + "\n", style="bold")
-    text.append("-" * 45 + "\n\n", style="dim")
+    text = _box_header(title, description)
     for i, n in enumerate(nodes):
         implied = n.parent_key == ".config" and whole
         glyph = "[-]" if implied else ("[x]" if n.checked else "[ ]")
@@ -264,7 +280,10 @@ def _toggle(nodes: list[Node], idx: int) -> None:
 
 
 def interactive_select(
-    nodes: list[Node], title: str, info: dict[str, str] | None = None
+    nodes: list[Node],
+    title: str,
+    info: dict[str, str] | None = None,
+    description: str | None = None,
 ) -> list[Node] | None:
     if not nodes:
         return []
@@ -284,22 +303,22 @@ def interactive_select(
         return None
 
     confirmed = _key_loop(
-        lambda: _render_checklist(nodes, state["cursor"], title, info), on_key
+        lambda: _render_checklist(nodes, state["cursor"], title, info, description),
+        on_key,
     )
     return nodes if confirmed else None
 
 
-def menu_select(title: str, options: list[tuple[str, str]]) -> str | None:
+def menu_select(
+    title: str, options: list[tuple[str, str]], description: str | None = None
+) -> str | None:
     state = {"cursor": 0}
 
     def render() -> Text:
-        text = Text()
-        text.append("-" * 45 + "\n", style="dim")
-        text.append("---- ", style="dim")
-        text.append(f"{title:^35}", style="bold")
-        text.append(" ----\n", style="dim")
-        text.append("-" * 45 + "\n\n", style="dim")
-        for i, (_, label) in enumerate(options):
+        text = _box_header(title, description)
+        for i, (key, label) in enumerate(options):
+            if key == "quit":
+                text.append("\n")
             pointer = ">" if i == state["cursor"] else " "
             style = "reverse" if i == state["cursor"] else ""
             text.append(f"{pointer} {label}\n", style=style)
@@ -375,7 +394,7 @@ def cmd_sync(_: argparse.Namespace) -> None:
         console.print("[yellow]Nothing to sync.[/yellow]")
         return
     preselect(nodes, "sync")
-    result = interactive_select(nodes, "Sync → profiles/")
+    result = interactive_select(nodes, "Save dotfiles")
     if result is None:
         if not (sys.stdin.isatty() and sys.stdout.isatty()):
             console.print("[red]Sync requires an interactive terminal.[/red]")
@@ -439,7 +458,7 @@ def cmd_apply(args: argparse.Namespace) -> None:
 
     if nodes:
         preselect(nodes, "apply")
-        result = interactive_select(nodes, "Apply ← profiles/")
+        result = interactive_select(nodes, "Apply dotfiles")
         if result is None and not (sys.stdin.isatty() and sys.stdout.isatty()):
             console.print("[red]Apply requires an interactive terminal.[/red]")
             return
@@ -496,7 +515,7 @@ def cmd_clean_profile(_: argparse.Namespace) -> None:
         console.print("[yellow]Profile is empty; nothing to clean.[/yellow]")
         return
     info = {n.key: last_sync_info(n.key) for n in nodes}
-    result = interactive_select(nodes, "Clean profile (delete from profiles/)", info=info)
+    result = interactive_select(nodes, "Clean dotfiles", info=info)
     if result is None:
         if not (sys.stdin.isatty() and sys.stdout.isatty()):
             console.print("[red]Clean profile requires an interactive terminal.[/red]")
@@ -538,10 +557,10 @@ def run_menu(args: argparse.Namespace) -> None:
         console.print("Usage: tui [-s | -a [NAME...] | -c | -P]")
         sys.exit(2)
     options = [
-        ("sync", "Sync to cloud"),
-        ("apply", "Apply from profiles"),
-        ("clean-profile", "Clean profile"),
-        ("clean", "Clean backups"),
+        ("sync", "Save dotfiles"),
+        ("apply", "Apply dotfiles"),
+        ("clean-profile", "Clean dotfiles"),
+        ("clean", "Clean dotfile backups"),
         ("quit", "Quit"),
     ]
     choice = menu_select("dotfiles TUI", options)
