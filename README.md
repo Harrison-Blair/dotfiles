@@ -2,26 +2,36 @@
 
 A repository to hold my dotfiles and a little helper tool I had claude build to manage my profiles between devices.
 
+> [!NOTE]
+> This README was written by Claude.
+
 ## TUI
 
 `tui` (built from `src/tui.py`) copies config folders between your live home directory and
 versioned snapshots in `profiles/`.
 
-Run with no arguments for an interactive menu (Sync / Apply / Clean backups / Quit), or use
-flags directly:
+Run with no arguments for an interactive menu (Sync to cloud / Apply from profiles / Clean
+backups / Quit), or use flags directly (mutually exclusive):
 
-- `tui --sync` — copy selected folders from `~` into `profiles/` and push.
-- `tui --apply [NAME...]` — restore folders from `profiles/` into `~` (backs up anything it
+- `-s`, `--sync` — copy selected folders from `~` into `profiles/`, then `git pull --rebase`,
+  commit (`Sync from <host> at <time> by <user>`), and push.
+- `-a`, `--apply [NAME...]` — restore folders from `profiles/` into `~` (backs up anything it
   replaces to `<name>.bak-<timestamp>`). With no names it's interactive; pass home-relative
   names (e.g. `.config/hypr`, `.claude`) for a non-interactive apply.
-- `tui --clean-backups` — list and delete `*.bak-*` left in `~` and `~/.config`.
+- `-c`, `--clean-backups` — list and delete `*.bak-*` left in `~` and `~/.config`.
+- `-v`, `--verbose` — enable verbose output.
+
+When apply finds nothing selected from `profiles/`, it falls back to an interactive list of
+the `*.bak-*` backups in `~` and `~/.config` and restores the one you pick (re-backing up the
+current copy first).
 
 ### Selecting folders
 
-Sync and apply both show an interactive checkbox list (↑/↓ move, space toggle, enter
+Sync and apply both show an interactive checkbox list (↑/↓ or j/k move, space toggle, enter
 confirm, q/esc cancel). The selectable folders are the dotfolders in `~` plus the subdirs of
 `~/.config`, shown hierarchically — `~/.config`'s subdirs are nested under a `.config` row.
-Check `.config` itself to sync/apply the **whole** folder, or check individual subdirs.
+Check `.config` itself to sync/apply the **whole** folder (children then show as implied
+`[-]`), or check individual subdirs.
 
 Your last selection is remembered per-user in `.data/cache/<username>.json` (gitignored) and
 pre-checked on the next run.
@@ -34,3 +44,17 @@ pre-checked on the next run.
 - `.data/includes.toml` — per-folder copy whitelists. By default `.claude` only syncs
   `agents/`, `commands/`, `teams/`, `plugins/`, `CLAUDE.md`, `settings.json`,
   `statusline-command.sh` (so its caches/history/projects stay out of the repo).
+
+### Building
+
+The `tui` binary at the repo root is a PyInstaller `--onefile` build of `src/tui.py`,
+committed by the **Build Tui Helper** GitHub Actions workflow
+(`.github/workflows/build-tui.yml`) on pushes that touch `src/tui.py`, `src/tui.spec`,
+`pyproject.toml`, or the workflow itself (commit message `Build tui binary [skip ci]`).
+
+To build locally: `pyinstaller --onefile --name tui --console src/tui.py` (deps:
+`rich==15.0.0`, `pyinstaller`; Python version pinned in `.python-version`; `src/tui.spec` is
+the generated spec).
+
+Nothing is baked into the binary — it reads `.data/*.toml` and writes `profiles/` relative to
+its own location, so the `tui` binary must live at the repo root.
