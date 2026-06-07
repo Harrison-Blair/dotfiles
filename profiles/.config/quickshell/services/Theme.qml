@@ -6,10 +6,10 @@ Singleton {
     id: theme
 
     // --- Layout ---
-    readonly property int barHeight: 54
-    readonly property int groupHeight: 46
-    readonly property int radius: 23
-    readonly property int pad: 18          // horizontal padding inside a group
+    readonly property int barHeight: 40
+    readonly property int groupHeight: 32
+    readonly property int radius: 16
+    readonly property int pad: 14          // horizontal padding inside a group
     readonly property int gap: 8           // gap between groups / bar side margins
     readonly property int itemSpacing: 8   // spacing between items within a group
 
@@ -17,8 +17,12 @@ Singleton {
     // Single family + fontconfig fallback to the Nerd Font, exactly as the
     // old waybar setup relied on (Noto Sans Mono falls back for glyphs).
     readonly property string fontFamily: "Noto Sans Mono"
+    // Dedicated, scalable Nerd symbol font (proportional) used for icon glyphs
+    // directly — NOT via fontconfig fallback, which mis-sizes/mis-centers them.
+    readonly property string iconFont: "Symbols Nerd Font"
     readonly property int fontSize: 16
-    readonly property int iconSize: 38     // enlarged Nerd Font glyphs
+    readonly property int iconSize: 22     // module icons
+    readonly property int iconSizeSmall: 18 // inline icons (e.g. network arrows)
 
     // --- Palette (lifted from waybar style.css / scripts) ---
     readonly property color fg: "#ff7cff"                       // rgb(255,124,255)
@@ -42,13 +46,15 @@ Singleton {
 
     // --- Nerd Font glyphs (codepoints extracted from the waybar config/scripts
     //     so they match exactly; referenced by codepoint to avoid PUA bytes) ---
+    // All Material Design glyphs (cell-filling) so sizes are consistent — the
+    // FontAwesome equivalents (F027/F028, F062/F063) render much smaller.
     readonly property string icoVolMute: String.fromCodePoint(0xF0E08)
     readonly property string icoVolLow:  String.fromCodePoint(0xF057F)
-    readonly property string icoVolMid:  String.fromCodePoint(0xF027)
-    readonly property string icoVolHigh: String.fromCodePoint(0xF028)
+    readonly property string icoVolMid:  String.fromCodePoint(0xF0580)  // md volume-medium
+    readonly property string icoVolHigh: String.fromCodePoint(0xF057E)  // md volume-high
 
-    readonly property string icoNetDown: String.fromCodePoint(0xF063)
-    readonly property string icoNetUp:   String.fromCodePoint(0xF062)
+    readonly property string icoNetDown: String.fromCodePoint(0xF0045)  // md arrow-down
+    readonly property string icoNetUp:   String.fromCodePoint(0xF005D)  // md arrow-up
     readonly property string icoNetDisc: String.fromCodePoint(0xF0BE1)
     readonly property string icoEthernet: String.fromCodePoint(0xF0200)
     // wifi signal strength, weakest → strongest (waybar format-icons)

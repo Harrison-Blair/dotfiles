@@ -71,6 +71,8 @@ Item {
         spacing: 6
         Icon {
             text: Theme.icoCpu
+            Layout.leftMargin: 2
+            Layout.rightMargin: 2
         }
         Text {
             textFormat: Text.RichText

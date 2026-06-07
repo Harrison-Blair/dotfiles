@@ -25,8 +25,11 @@ Item {
         const d = root.now
         return "UTC " + pad(d.getUTCHours()) + ":" + pad(d.getUTCMinutes()) + ":" + pad(d.getUTCSeconds())
     }
+    function localDate() {
+        return Qt.formatDateTime(root.now, "yyyy-MM-dd")
+    }
     function localTime() {
-        return "EST " + Qt.formatDateTime(root.now, "yyyy-MM-dd HH:mm:ss")
+        return "EST " + Qt.formatDateTime(root.now, "HH:mm:ss")
     }
     function utcDateStr() {
         const days = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"]
@@ -41,13 +44,19 @@ Item {
         anchors.centerIn: parent
         spacing: 16
         Text {
-            text: root.utcTime()
+            text: root.localDate()
             color: Theme.fg
             font.family: Theme.fontFamily
             font.pixelSize: Theme.fontSize
         }
         Text {
             text: root.localTime()
+            color: Theme.fg
+            font.family: Theme.fontFamily
+            font.pixelSize: Theme.fontSize
+        }
+        Text {
+            text: root.utcTime()
             color: Theme.fg
             font.family: Theme.fontFamily
             font.pixelSize: Theme.fontSize

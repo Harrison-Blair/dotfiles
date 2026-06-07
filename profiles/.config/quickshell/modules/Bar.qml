@@ -29,7 +29,9 @@ PanelWindow {
         Audio {}
         Separator {}
         Network {}
+        Separator {}
         Memory {}
+        Separator {}
         Cpu {}
         Separator {}
         Temperature {}

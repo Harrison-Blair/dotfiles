@@ -4,11 +4,13 @@ import QtQuick.Layouts
 import qs.services
 import qs.components
 
-// Default sink volume (waybar pulseaudio).
-RowLayout {
+// Default sink volume (waybar pulseaudio). Click opens a menu with a button to
+// launch pavucontrol.
+Item {
     id: root
+    implicitWidth: row.implicitWidth
+    implicitHeight: Theme.groupHeight
     Layout.alignment: Qt.AlignVCenter
-    spacing: 6
 
     readonly property var sink: Pipewire.defaultAudioSink
     readonly property bool ready: sink && sink.audio
@@ -25,13 +27,42 @@ RowLayout {
         return Theme.icoVolHigh
     }
 
-    Text {
-        text: root.muted ? "Mute" : (root.volume + "%")
-        color: Theme.fg
-        font.family: Theme.fontFamily
-        font.pixelSize: Theme.fontSize
+    RowLayout {
+        id: row
+        anchors.centerIn: parent
+        spacing: 6
+        Text {
+            text: root.muted ? "Mute" : (root.volume + "%")
+            color: Theme.fg
+            font.family: Theme.fontFamily
+            font.pixelSize: Theme.fontSize
+        }
+        Icon {
+            text: root.volIcon()
+        }
     }
-    Icon {
-        text: root.volIcon()
+
+    MouseArea {
+        anchors.fill: parent
+        hoverEnabled: true
+        cursorShape: Qt.PointingHandCursor
+        onClicked: menu.visible = !menu.visible
+    }
+
+    PopupMenu {
+        id: menu
+        anchorItem: root
+        Text {
+            text: (root.ready && root.sink.description ? root.sink.description : "Audio")
+                  + "\n" + (root.muted ? "Muted" : root.volume + "%")
+            color: Theme.fg
+            font.family: Theme.fontFamily
+            font.pixelSize: Theme.fontSize - 1
+        }
+        MenuButton {
+            label: "Open pavucontrol"
+            command: ["pavucontrol"]
+            onTriggered: menu.visible = false
+        }
     }
 }

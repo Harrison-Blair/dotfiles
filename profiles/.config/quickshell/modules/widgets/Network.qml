@@ -158,12 +158,10 @@ Item {
             Layout.preferredWidth: rateMetrics.width
             horizontalAlignment: Text.AlignRight
         }
-        Text {
+        Icon {
             visible: root.connected
             text: Theme.icoNetDown
-            color: Theme.fg
-            font.family: Theme.fontFamily
-            font.pixelSize: Theme.fontSize
+            size: Theme.iconSizeSmall
         }
         Text {
             visible: root.connected
@@ -174,12 +172,10 @@ Item {
             Layout.preferredWidth: rateMetrics.width
             horizontalAlignment: Text.AlignRight
         }
-        Text {
+        Icon {
             visible: root.connected
             text: Theme.icoNetUp
-            color: Theme.fg
-            font.family: Theme.fontFamily
-            font.pixelSize: Theme.fontSize
+            size: Theme.iconSizeSmall
         }
     }
 

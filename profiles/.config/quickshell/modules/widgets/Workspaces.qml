@@ -44,7 +44,9 @@ Item {
                 MouseArea {
                     anchors.fill: parent
                     cursorShape: Qt.PointingHandCursor
-                    onClicked: Hyprland.dispatch("workspace " + ws.modelData.id)
+                    // This Hyprland uses a Lua config: dispatch payloads are
+                    // evaluated as Lua, so mirror the keybinds' hl.dsp.focus call.
+                    onClicked: Hyprland.dispatch("hl.dsp.focus({workspace=" + ws.modelData.id + "})")
                 }
             }
         }

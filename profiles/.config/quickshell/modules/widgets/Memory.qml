@@ -55,6 +55,8 @@ Item {
         spacing: 6
         Icon {
             text: Theme.icoMem
+            Layout.leftMargin: 2
+            Layout.rightMargin: 2
         }
         Text {
             text: root.usedGb.toFixed(2) + "G"
