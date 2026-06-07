@@ -459,16 +459,18 @@ def cmd_apply(args: argparse.Namespace) -> None:
     if nodes:
         preselect(nodes, "apply")
         result = interactive_select(nodes, "Apply dotfiles")
-        if result is None and not (sys.stdin.isatty() and sys.stdout.isatty()):
-            console.print("[red]Apply requires an interactive terminal.[/red]")
+        if result is None:
+            if not (sys.stdin.isatty() and sys.stdout.isatty()):
+                console.print("[red]Apply requires an interactive terminal.[/red]")
+            else:
+                console.print("[yellow]Cancelled.[/yellow]")
             return
-        if result is not None:
-            keys = effective_selection(result)
-            if keys:
-                save_cache("apply", keys)
-                for key in keys:
-                    apply_key(key, ts)
-                return
+        keys = effective_selection(result)
+        if keys:
+            save_cache("apply", keys)
+            for key in keys:
+                apply_key(key, ts)
+            return
 
     if backups:
         console.print("[bold]Backups:[/bold]")
