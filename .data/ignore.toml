@@ -1,0 +1,28 @@
+# Folder names hidden from the selection list.
+# Matched by name (not path) against BOTH top-level ~ dotfolders and ~/.config subdirs.
+# Edit freely — read at runtime, no rebuild needed.
+ignore = [
+  # noise / caches / state
+  ".cache",
+  ".local",
+  ".npm",
+  ".nvm",
+  ".rustup",
+  ".cargo",
+  ".docker",
+  ".mozilla",
+  # secrets — keep these out of a synced repo
+  ".ssh",
+  ".gnupg",
+  ".pki",
+  # noisy ~/.config browser/app profile dirs (matched inside .config by name)
+  "google-chrome",
+  "google-chrome-beta",
+  "google-chrome-unstable",
+  "chromium",
+  "BraveSoftware",
+  "microsoft-edge-dev",
+  "vivaldi",
+  "vivaldi-snapshot",
+  "1Password",
+]

@@ -1,0 +1,14 @@
+# Per-folder copy whitelists, keyed by home-relative folder path.
+# When a listed folder is synced, ONLY these entries are copied into profiles/.
+# Folders NOT listed here are copied wholesale.
+# Used to keep ~/.claude's caches/history/projects out of the synced profile.
+[includes]
+".claude" = [
+  "agents",
+  "commands",
+  "teams",
+  "plugins",
+  "CLAUDE.md",
+  "settings.json",
+  "statusline-command.sh",
+]
