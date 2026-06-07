@@ -38,16 +38,16 @@ toggle, enter confirm, q/esc cancel). The selectable folders are the dotfolders 
 `.config`'s subdirs are nested under a `.config` row. Check `.config` itself to act on the
 **whole** folder (children then show as implied `[-]`), or check individual subdirs.
 
-Sync and apply remember your last selection per-user in `.data/cache/<username>.json`
+Sync and apply remember your last selection per-user in `config/cache/<username>.json`
 (gitignored) and pre-check it on the next run. Clean-profile never pre-checks (it starts
 empty so a cached selection can't cause an accidental delete).
 
 ### Layout
 
 - `profiles/` mirrors home-relative paths: `profiles/.claude`, `profiles/.config/<name>`.
-- `.data/ignore.toml` — folder names hidden from the list (noise/secrets like `.ssh`,
+- `config/ignore.toml` — folder names hidden from the list (noise/secrets like `.ssh`,
   `.gnupg`, `.cache`, browser profile dirs). Edited freely; read at runtime.
-- `.data/includes.toml` — per-folder copy whitelists. By default `.claude` only syncs
+- `config/includes.toml` — per-folder copy whitelists. By default `.claude` only syncs
   `agents/`, `commands/`, `teams/`, `plugins/`, `CLAUDE.md`, `settings.json`,
   `statusline-command.sh` (so its caches/history/projects stay out of the repo).
 
@@ -62,5 +62,5 @@ To build locally: `pyinstaller --onefile --name tui --console src/tui.py` (deps:
 `rich==15.0.0`, `pyinstaller`; Python version pinned in `.python-version`; `src/tui.spec` is
 the generated spec).
 
-Nothing is baked into the binary — it reads `.data/*.toml` and writes `profiles/` relative to
+Nothing is baked into the binary — it reads `config/*.toml` and writes `profiles/` relative to
 its own location, so the `tui` binary must live at the repo root.

@@ -29,7 +29,7 @@ REPO_ROOT = (
     else Path(__file__).resolve().parent.parent
 )
 PROFILES_DIR = REPO_ROOT / "profiles"
-DATA_DIR = REPO_ROOT / ".data"
+DATA_DIR = REPO_ROOT / "config"
 CACHE_DIR = DATA_DIR / "cache"
 
 console = Console()
