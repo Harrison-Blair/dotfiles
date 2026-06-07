@@ -40,8 +40,8 @@
 	},
 
 	"pulseaudio": {
-		"format": "{volume}%  <span size='x-large'>{icon}</span> ",
-		"format-muted": "Mute  <span size='x-large'>󰸈</span> ",
+		"format": "{volume}%  <span size='xx-large'>{icon}</span> ",
+		"format-muted": "Mute  <span size='xx-large'>󰸈</span> ",
 		"format-icons": [
 			"󰕿",
 			"",
@@ -53,10 +53,10 @@
 		"interval": 1,
 		"min-length": 28,
 		"max-length": 28,
-		"format": "<span size='x-large'>{icon}</span>  {bandwidthDownBytes:>4}  {bandwidthUpBytes:>4} ",
-		"format-disconnected": "<span size='x-large'>󰯡</span>",
-		"format-wifi": "<span size='x-large'>{icon}</span>  {bandwidthDownBytes:>4}  {bandwidthUpBytes:>4} ",
-		"format-ethernet": "<span size='x-large'>󰈀</span>  {bandwidthDownBytes:>4}  {bandwidthUpBytes:>4} ",
+		"format": "<span size='xx-large'>{icon}</span>  {bandwidthDownBytes:>4}  {bandwidthUpBytes:>4} ",
+		"format-disconnected": "<span size='xx-large'>󰯡</span>",
+		"format-wifi": "<span size='xx-large'>{icon}</span>  {bandwidthDownBytes:>4} <span size='xx-large'></span> {bandwidthUpBytes:>4} <span size='xx-large'></span>",
+		"format-ethernet": "<span size='xx-large'>󰈀</span>  {bandwidthDownBytes:>4}  {bandwidthUpBytes:>4} ",
 		"format-icons": [
 			"<span color='#dd532e'>󰤯</span>", // r
 			"<span color='#ffffa5'>󰤟</span>", // y
@@ -72,14 +72,14 @@
 		"interval": 1,
 		"min-length": 11,
 		"max-length": 11,
-		"format": "<span size='x-large'></span>  {used:0.2f}G",
+		"format": "<span size='xx-large'></span>  {used:0.2f}G",
 		"tooltip-format": "Memory:\t{used:0.2f} / {total:0.2f} | {percentage:>3}%\nSwap:\t{swapUsed:0.2f} / {swapTotal:0.2f} | {swapPercentage:>3}%",
 		"on-click": "kitty -e htop"
 	},
 
 	"cpu": {
 		"interval": 1,
-		"format": "<span size='x-large'></span>  {icon0}{icon1}{icon2}{icon3}{icon4}{icon5}{icon6}{icon7}{icon8}{icon9}{icon10}{icon11}{icon12}{icon13}{icon14}{icon15}",
+		"format": "<span size='xx-large'></span>  {icon0}{icon1}{icon2}{icon3}{icon4}{icon5}{icon6}{icon7}{icon8}{icon9}{icon10}{icon11}{icon12}{icon13}{icon14}{icon15}",
 		"format-icons": [
 			"▁",
 			"▂", 
@@ -127,7 +127,7 @@
 	},
 	"clock#local": {
 		"interval": 1,
-		"format": "EST {:%H:%M:%S}",
+		"format": "EST {:%Y-%m-%d %H:%M:%S}",
 		"tooltip-format": "{:%A, %B %d, %Y }"
 	},
 

@@ -290,10 +290,10 @@ done
 make_pair() {
 	local icon="$1" temp="$2" crit="$3"
 	if [[ "$crit" == "1" ]]; then
-		printf '<span size="x-large" color="%s">%s</span>  <span color="%s">%s°</span>' \
+		printf '<span size="xx-large" color="%s">%s</span>  <span color="%s">%s°</span>' \
 			"$CRIT_COLOR" "$icon" "$CRIT_COLOR" "$temp"
 	else
-		printf '<span size="x-large">%s</span>  %s°' "$icon" "$temp"
+		printf '<span size="xx-large">%s</span>  %s°' "$icon" "$temp"
 	fi
 }
 
@@ -311,9 +311,9 @@ else
 	# No CPU/GPU/SSD detected — show CPU icon alone (placeholder) so module
 	# stays visible. Tooltip still shows whatever sensors did report.
 	if (( any_critical )); then
-		text="<span size=\"x-large\" color=\"${CRIT_COLOR}\">${ICON_CPU}</span>"
+		text="<span size=\"xx-large\" color=\"${CRIT_COLOR}\">${ICON_CPU}</span>"
 	else
-		text="<span size=\"x-large\">${ICON_CPU}</span>"
+		text="<span size=\"xx-large\">${ICON_CPU}</span>"
 	fi
 fi
 
