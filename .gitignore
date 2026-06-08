@@ -218,3 +218,6 @@ __marimo__/
 
 # dotfiles TUI per-user sync cache
 config/cache/
+
+# Claude Code dev-team session state (runtime; may contain proprietary data)
+profiles/.claude/teams/
