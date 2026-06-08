@@ -16,6 +16,7 @@ ignore = [
   ".gnupg",
   ".pki",
   # noisy ~/.config browser/app profile dirs (matched inside .config by name)
+  "mozilla",
   "google-chrome",
   "google-chrome-beta",
   "google-chrome-unstable",
