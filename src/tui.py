@@ -31,6 +31,7 @@ REPO_ROOT = (
 PROFILES_DIR = REPO_ROOT / "profiles"
 DATA_DIR = REPO_ROOT / "config"
 CACHE_DIR = DATA_DIR / "cache"
+CACHE_VERSION = 1
 
 console = Console()
 
@@ -81,9 +82,12 @@ def cache_path() -> Path:
 def load_cache() -> dict:
     try:
         with cache_path().open() as f:
-            return json.load(f)
+            data = json.load(f)
     except (FileNotFoundError, json.JSONDecodeError, OSError):
         return {}
+    if data.get("version") != CACHE_VERSION:
+        return {}
+    return data
 
 
 def preselect(nodes: list[Node], mode: str) -> None:
@@ -96,7 +100,7 @@ def preselect(nodes: list[Node], mode: str) -> None:
 def save_cache(mode: str, keys: list[str]) -> None:
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
     cache = load_cache()
-    cache["version"] = 1
+    cache["version"] = CACHE_VERSION
     cache[mode] = {"selected": keys}
     with cache_path().open("w") as f:
         json.dump(cache, f, indent=2)
@@ -156,40 +160,69 @@ def effective_selection(nodes: list[Node]) -> list[str]:
     return keys
 
 
-def last_sync_info(key: str) -> str:
-    """Human-readable 'last synced' line for a profiles/ folder, from git history."""
-    rel = (PROFILES_DIR / key).relative_to(REPO_ROOT)
-    out = subprocess.run(
-        ["git", "log", "-1", "--format=%cI%x00%s", "--", str(rel)],
-        cwd=REPO_ROOT, capture_output=True, text=True,
-    ).stdout.strip()
-    if not out:
-        return "untracked / never synced"
-    date_iso, _, subject = out.partition("\x00")
+def _format_sync(date_iso: str, subject: str) -> str:
     when = date_iso[:16].replace("T", " ")  # 2026-06-07 19:32
     m = re.search(r"Sync from (\S+) .* by (\S+)", subject)
     if m:
-        host, user = m.group(1), m.group(2)
-        return f"last sync {when} from {host} by {user}"
+        return f"last sync {when} from {m.group(1)} by {m.group(2)}"
     return f"last commit {when}"
+
+
+def last_sync_info(keys: list[str]) -> dict[str, str]:
+    """Map each profiles/ key to a human-readable 'last synced' line, using a
+    single git traversal instead of one subprocess per key."""
+    rel = PROFILES_DIR.relative_to(REPO_ROOT).as_posix()
+    out = subprocess.run(
+        ["git", "log", "--format=%x00%cI%x1f%s", "--name-only", "--", rel],
+        cwd=REPO_ROOT, capture_output=True, text=True,
+    ).stdout
+    info: dict[str, str] = {}
+    pending = set(keys)
+    cur: tuple[str, str] | None = None
+    for line in out.splitlines():  # newest commit first
+        if line.startswith("\x00"):
+            date_iso, _, subject = line[1:].partition("\x1f")
+            cur = (date_iso, subject)
+        elif line and cur is not None and pending:
+            matched = [
+                k for k in pending
+                if line == f"{rel}/{k}" or line.startswith(f"{rel}/{k}/")
+            ]
+            for k in matched:
+                info[k] = _format_sync(*cur)
+                pending.discard(k)
+    for k in pending:
+        info[k] = "untracked / never synced"
+    return info
 
 
 # --- interactive selection (Rich Live + raw key input) ----------------------
 
 
+_ESC_TIMEOUT = 0.05  # seconds to wait for the rest of an escape sequence
+
+
 def _read_key(fd: int) -> str:
     ch = os.read(fd, 1)
     if ch == b"\x1b":
-        rest = b""
-        if select.select([fd], [], [], 0.01)[0]:
-            rest = os.read(fd, 2)
-        if rest == b"[A":
-            return "up"
-        if rest == b"[B":
-            return "down"
-        if rest in (b"[C", b"[D"):
-            return ""
-        return "quit"  # bare ESC cancels
+        # Bare ESC (nothing follows) cancels; otherwise drain the whole sequence.
+        if not select.select([fd], [], [], _ESC_TIMEOUT)[0]:
+            return "quit"
+        intro = os.read(fd, 1)
+        if intro not in (b"[", b"O"):
+            return ""  # unrecognized escape; ignore
+        final = b""
+        while select.select([fd], [], [], _ESC_TIMEOUT)[0]:
+            b = os.read(fd, 1)
+            final += b
+            if b and 0x40 <= b[0] <= 0x7E:  # CSI/SS3 final byte
+                break
+        if intro == b"[":
+            if final == b"A":
+                return "up"
+            if final == b"B":
+                return "down"
+        return ""  # recognized but unhandled sequence; ignore
     if ch in (b"\r", b"\n"):
         return "enter"
     if ch == b" ":
@@ -345,11 +378,16 @@ def menu_select(
 # --- copy helpers -----------------------------------------------------------
 
 
-def copy_folder(src: Path, dst: Path, includes_list: list[str] | None) -> None:
+def copy_folder(
+    src: Path, dst: Path, includes_list: list[str] | None, ignore: set[str] | None = None
+) -> None:
     _remove(dst)
     if includes_list is None:
         dst.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copytree(src, dst, symlinks=True)
+        ignore_fn = (
+            (lambda _dir, names: [n for n in names if n in ignore]) if ignore else None
+        )
+        shutil.copytree(src, dst, symlinks=True, ignore=ignore_fn)
         return
     dst.mkdir(parents=True, exist_ok=True)
     for entry in includes_list:
@@ -415,7 +453,7 @@ def cmd_sync(_: argparse.Namespace) -> None:
         if not src.exists():
             console.print(f"[red]Missing {src}, skipping.[/red]")
             continue
-        copy_folder(src, PROFILES_DIR / key, includes.get(key))
+        copy_folder(src, PROFILES_DIR / key, includes.get(key), ignore)
         console.print(f"  copied [cyan]{key}[/cyan]")
 
     rel = PROFILES_DIR.relative_to(REPO_ROOT)
@@ -442,7 +480,7 @@ def cmd_apply(args: argparse.Namespace) -> None:
     ts = datetime.now().strftime("%Y%m%d-%H%M%S")
 
     if args.apply:
-        available = {n.key for n in nodes} | {".config"}
+        available = {n.key for n in nodes}
         missing = [n for n in args.apply if n not in available]
         if missing:
             console.print(f"[red]Not found in profiles/: {', '.join(missing)}[/red]")
@@ -466,11 +504,13 @@ def cmd_apply(args: argparse.Namespace) -> None:
                 console.print("[yellow]Cancelled.[/yellow]")
             return
         keys = effective_selection(result)
-        if keys:
-            save_cache("apply", keys)
-            for key in keys:
-                apply_key(key, ts)
+        if not keys:
+            console.print("[yellow]Nothing selected; aborting.[/yellow]")
             return
+        save_cache("apply", keys)
+        for key in keys:
+            apply_key(key, ts)
+        return
 
     if backups:
         console.print("[bold]Backups:[/bold]")
@@ -516,7 +556,7 @@ def cmd_clean_profile(_: argparse.Namespace) -> None:
     if not nodes:
         console.print("[yellow]Profile is empty; nothing to clean.[/yellow]")
         return
-    info = {n.key: last_sync_info(n.key) for n in nodes}
+    info = last_sync_info([n.key for n in nodes])
     result = interactive_select(nodes, "Clean dotfiles", info=info)
     if result is None:
         if not (sys.stdin.isatty() and sys.stdout.isatty()):
@@ -578,7 +618,6 @@ def run_menu(args: argparse.Namespace) -> None:
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(prog="tui", description="dotfiles TUI")
-    parser.add_argument("-v", "--verbose", action="store_true", help="enable verbose output")
     group = parser.add_mutually_exclusive_group()
     group.add_argument("-s", "--sync", action="store_true", help="copy live configs into profiles/ and push")
     group.add_argument("-a", "--apply", nargs="*", default=None, metavar="NAME", help="apply configs from profiles/ to ~ (optional home-relative names for non-interactive)")
