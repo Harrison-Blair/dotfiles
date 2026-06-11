@@ -6,7 +6,6 @@
 ".claude" = [
   "agents",
   "commands",
-  "teams",
   "plugins",
   "CLAUDE.md",
   "settings.json",
