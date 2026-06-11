@@ -1,0 +1,9 @@
+[terminal]
+vt = 1
+
+[default_session]
+# cage hosts the greeter quickshell (single-app kiosk); -s allows VT switching,
+# -d drops window decorations, -m last uses only the last-connected monitor
+# (cage ignores client output requests, so this is its only placement knob).
+command = "cage -s -d -m last -- qs -p /home/penguin/.config/quickshell/greeter.qml"
+user = "greeter"

@@ -71,6 +71,13 @@ Singleton {
     readonly property string icoReload: String.fromCodePoint(0xF00E2)
     readonly property string icoScreenshot: String.fromCodePoint(0xF0100)  // md camera
 
+    // session / power menu (md glyphs)
+    readonly property string icoPower:    String.fromCodePoint(0xF0425)  // md power (bar button)
+    readonly property string icoLock:     String.fromCodePoint(0xEA75)   // cod lock
+    readonly property string icoLogout:   String.fromCodePoint(0xF0343)  // md logout
+    readonly property string icoReboot:   String.fromCodePoint(0xEAD2)   // cod debug-restart
+    readonly property string icoShutdown: String.fromCodePoint(0xF0425)  // md power
+
     // sensors (scripts/sensors.sh)
     readonly property string icoSensCpu:    String.fromCodePoint(0xF4BC)
     readonly property string icoSensDgpu:   String.fromCodePoint(0xF08AE)

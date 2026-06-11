@@ -39,5 +39,7 @@ PanelWindow {
         Battery { id: battery }
         Separator {}
         Screenshot {}
+        Separator {}
+        PowerMenu {}
     }
 }

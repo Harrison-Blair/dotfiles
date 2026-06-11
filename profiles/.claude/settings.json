@@ -2,9 +2,6 @@
   "env": {
     "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
   },
-  "permissions": {
-    "defaultMode": "plan"
-  },
   "statusLine": {
     "type": "command",
     "command": "/home/penguin/.claude/statusline-command.sh"
@@ -12,5 +9,6 @@
   "theme": "dark-daltonized",
   "teammateMode": "auto",
   "agentPushNotifEnabled": true,
-  "skipAutoPermissionPrompt": true
+  "skipAutoPermissionPrompt": true,
+  "model": "claude-fable-5[1m]"
 }
