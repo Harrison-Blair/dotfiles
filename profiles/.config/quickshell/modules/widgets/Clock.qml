@@ -41,13 +41,13 @@ Item {
         anchors.centerIn: parent
         spacing: 16
         Text {
-            text: root.localTime()
+            text: root.utcTime()
             color: Theme.fg
             font.family: Theme.fontFamily
             font.pixelSize: Theme.fontSize
         }
         Text {
-            text: root.utcTime()
+            text: root.localTime()
             color: Theme.fg
             font.family: Theme.fontFamily
             font.pixelSize: Theme.fontSize
