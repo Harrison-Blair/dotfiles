@@ -24,10 +24,6 @@ PanelWindow {
 
         Workspaces {}
         Separator {}
-        Clock {}
-        Separator {}
-        Audio {}
-        Separator {}
         Network {}
         Separator {}
         Memory {}
@@ -37,6 +33,10 @@ PanelWindow {
         Temperature {}
         Separator { visible: battery.present }
         Battery { id: battery }
+        Separator {}
+        Clock {}
+        Separator {}
+        Audio {}
         Separator {}
         Screenshot {}
         Separator {}

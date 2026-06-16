@@ -14,8 +14,15 @@
 -- end)
 
 hl.on("hyprland.start", function ()
-    hl.exec_cmd("dbus-update-activation-environment --systemd WAYLAND_DISPLAY XDG_CURRENT_DESKTOP")
-    hl.exec_cmd("systemctl --user start hyprpolkitagent")
+    -- Push the Wayland env into dbus + systemd, then bring up the graphical
+    -- session target. Without this, graphical-session.target stays inactive and
+    -- xdg-desktop-portal (Requisite=graphical-session.target) never starts, so
+    -- no app can read color-scheme=prefer-dark and everything renders light.
+    -- Chain these: the env must land in the systemd user environment BEFORE the
+    -- target starts, or units pulled in by it (hyprpolkitagent, a Qt/wayland app)
+    -- race the Wayland socket and crash. hyprpolkitagent is enabled (WantedBy
+    -- graphical-session.target), so the target activation starts it for us.
+    hl.exec_cmd("dbus-update-activation-environment --systemd --all && systemctl --user start hyprland-session.target")
 
     hl.exec_cmd("qs -d")
     hl.exec_cmd("wl-paste --watch clipvault store")
