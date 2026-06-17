@@ -27,6 +27,9 @@ hl.on("hyprland.start", function ()
     hl.exec_cmd("qs -d")
     hl.exec_cmd("wl-paste --watch clipvault store")
 
+    -- HyperX QuadCast 2 S RGB: solid white (needs the 99-quadcastrgb.rules udev rule)
+    hl.exec_cmd("quadcastrgb solid ffffff")
+
     hl.exec_cmd("gsettings set org.gnome.desktop.interface color-scheme \"prefer-dark\"")
     hl.exec_cmd("gsettings set org.gnome.desktop.interface gtk-theme \"adw-gtk3\"")
 end)
