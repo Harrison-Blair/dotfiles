@@ -32,4 +32,8 @@ hl.on("hyprland.start", function ()
 
     hl.exec_cmd("gsettings set org.gnome.desktop.interface color-scheme \"prefer-dark\"")
     hl.exec_cmd("gsettings set org.gnome.desktop.interface gtk-theme \"adw-gtk3\"")
+
+    -- Start the awww wallpaper daemon and restore the cached wallpaper once all
+    -- monitors are up (the helper waits for them, fixing the DP-1 login race).
+    hl.exec_cmd("/home/penguin/.config/hypr/scripts/wallpaper.sh")
 end)
