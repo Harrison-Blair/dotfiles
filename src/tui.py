@@ -66,6 +66,23 @@ def load_ignore() -> set[str]:
     return set(data.get("ignore", []))
 
 
+def save_ignore(selected: set[str], nodes: list[Node], old: set[str]) -> None:
+    """Rewrite ignore.toml. Entries in `old` that aren't scannable on this machine
+    are preserved untouched (we can't show them, so we don't drop them)."""
+    scannable = {n.label for n in nodes}
+    final = sorted(selected | (old - scannable))
+    lines = [
+        "# Folder names hidden from the selection list.",
+        "# Matched by name (not path) against BOTH top-level ~ dotfolders and ~/.config subdirs.",
+        '# Edit via the TUI "Edit block list" menu, or by hand — read at runtime, no rebuild needed.',
+        "ignore = [",
+        *[f"  {json.dumps(name)}," for name in final],
+        "]",
+        "",
+    ]
+    (DATA_DIR / "ignore.toml").write_text("\n".join(lines))
+
+
 def load_includes() -> dict[str, list[str]]:
     try:
         with (DATA_DIR / "includes.toml").open("rb") as f:
@@ -94,6 +111,12 @@ def preselect(nodes: list[Node], mode: str) -> None:
     saved = set(load_cache().get(mode, {}).get("selected", []))
     for n in nodes:
         if n.key in saved:
+            n.checked = True
+
+
+def preselect_blocked(nodes: list[Node], ignore: set[str]) -> None:
+    for n in nodes:
+        if n.label in ignore:
             n.checked = True
 
 
@@ -158,6 +181,21 @@ def effective_selection(nodes: list[Node]) -> list[str]:
         elif n.checked:
             keys.append(n.key)
     return keys
+
+
+def blocked_names(nodes: list[Node]) -> set[str]:
+    whole = _config_whole(nodes)
+    names: set[str] = set()
+    for n in nodes:
+        if n.is_parent and n.key == ".config":
+            if n.checked:
+                names.add(".config")
+        elif n.parent_key == ".config":
+            if not whole and n.checked:
+                names.add(n.label)
+        elif n.checked:
+            names.add(n.label)
+    return names
 
 
 def _format_sync(date_iso: str, subject: str) -> str:
@@ -500,6 +538,43 @@ def cmd_sync(_: argparse.Namespace) -> None:
     console.print(f"[green]Synced:[/green] {msg}")
 
 
+def cmd_block(_: argparse.Namespace) -> None:
+    hostname = socket.gethostname()
+    ignore = load_ignore()
+    nodes = build_sync_tree(set())
+    if not nodes:
+        console.print("[yellow]No folders to block.[/yellow]")
+        return
+    preselect_blocked(nodes, ignore)
+    result = interactive_select(
+        nodes, "Edit block list",
+        description="Checked folders are hidden from the sync list.",
+    )
+    if result is None:
+        if not (sys.stdin.isatty() and sys.stdout.isatty()):
+            console.print("[red]Editing the block list requires an interactive terminal.[/red]")
+        else:
+            console.print("[yellow]Cancelled.[/yellow]")
+        return
+    selected = blocked_names(result)
+
+    subprocess.run(["git", "pull", "--rebase"], cwd=REPO_ROOT, check=True)
+    save_ignore(selected, nodes, ignore)
+
+    rel = (DATA_DIR / "ignore.toml").relative_to(REPO_ROOT)
+    subprocess.run(["git", "add", "--", str(rel)], cwd=REPO_ROOT, check=True)
+    staged = subprocess.run(["git", "diff", "--cached", "--quiet"], cwd=REPO_ROOT)
+    if staged.returncode == 0:
+        console.print("[yellow]No changes to the block list.[/yellow]")
+        return
+
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    msg = f"Update block list from {hostname} at {now} by {getuser()}"
+    subprocess.run(["git", "commit", "-m", msg], cwd=REPO_ROOT, check=True)
+    subprocess.run(["git", "push"], cwd=REPO_ROOT, check=True)
+    console.print("[green]Block list updated.[/green]")
+
+
 def _all_backups() -> list[Path]:
     return sorted(CONFIG_DIR.glob("*.bak-*")) + sorted(HOME.glob("*.bak-*"))
 
@@ -633,6 +708,7 @@ def run_menu(args: argparse.Namespace) -> None:
         ("apply", "Apply dotfiles"),
         ("clean-profile", "Clean dotfiles"),
         ("clean", "Clean dotfile backups"),
+        ("block", "Edit block list"),
         ("quit", "Quit"),
     ]
     choice = menu_select("dotfiles TUI", options)
@@ -644,6 +720,8 @@ def run_menu(args: argparse.Namespace) -> None:
         cmd_clean_profile(args)
     elif choice == "clean":
         cmd_clean_backups(args)
+    elif choice == "block":
+        cmd_block(args)
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
