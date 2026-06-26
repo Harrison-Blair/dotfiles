@@ -1,30 +1,27 @@
 # Folder names hidden from the selection list.
 # Matched by name (not path) against BOTH top-level ~ dotfolders and ~/.config subdirs.
-# Edit freely — read at runtime, no rebuild needed.
+# Edit via the TUI "Edit block list" menu, or by hand — read at runtime, no rebuild needed.
 ignore = [
-  # noise / caches / state
   ".cache",
-  ".local",
-  ".npm",
-  ".nvm",
-  ".rustup",
   ".cargo",
   ".docker",
-  ".mozilla",
-  ".steam",
-  # secrets — keep these out of a synced repo
-  ".ssh",
   ".gnupg",
+  ".local",
+  ".mozilla",
+  ".npm",
+  ".nvm",
   ".pki",
-  # noisy ~/.config browser/app profile dirs (matched inside .config by name)
-  "mozilla",
+  ".rustup",
+  ".ssh",
+  ".steam",
+  "1Password",
+  "BraveSoftware",
+  "chromium",
   "google-chrome",
   "google-chrome-beta",
   "google-chrome-unstable",
-  "chromium",
-  "BraveSoftware",
   "microsoft-edge-dev",
+  "mozilla",
   "vivaldi",
   "vivaldi-snapshot",
-  "1Password",
 ]
