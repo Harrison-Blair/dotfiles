@@ -1,0 +1,40 @@
+"Registry"
+{
+	"HKLM"
+	{
+		"Software"
+		{
+			"Valve"
+			{
+				"Steam"
+				{
+					"SteamPID"		"145576"
+					"ClientLauncherType"		"0"
+				}
+			}
+		}
+	}
+	"HKCU"
+	{
+		"Software"
+		{
+			"Valve"
+			{
+				"Steam"
+				{
+					"StartupModeTmpIsValid"		"0"
+					"language"		"english"
+					"CompletedOOBEStage1"		"1"
+					"SourceModInstallPath"		"/home/penguin/.local/share/Steam/steamapps\\sourcemods"
+					"AutoLoginUser"		"hjbutter"
+					"Rate"		"30000"
+					"AlreadyRetriedOfflineMode"		"0"
+				}
+				"Steamsteamglobal"
+				{
+					"language"		"english"
+				}
+			}
+		}
+	}
+}

@@ -132,13 +132,15 @@ Item {
         }
     }
 
-    // Fixed width for a rate value so changing digit counts never resize the bar
-    // (widest output is e.g. "1023B" / "1023M" — 5 monospace chars).
+    // Fixed width for a rate value so changing digit counts never resize the bar.
+    // Widest output is the "G" branch, which always carries a decimal: e.g.
+    // "120.0G" — wider than "1023M". Size for the worst case so the right-aligned
+    // text never overflows its box and collides with the wifi icon.
     TextMetrics {
         id: rateMetrics
         font.family: Theme.fontFamily
         font.pixelSize: Theme.fontSize
-        text: "1023M"
+        text: "1023.9G"
     }
 
     RowLayout {
@@ -148,6 +150,7 @@ Item {
         Icon {
             text: root.netIcon()
             color: root.netIconColor()
+            Layout.rightMargin: 4
         }
         Text {
             visible: root.connected
@@ -162,6 +165,8 @@ Item {
             visible: root.connected
             text: Theme.icoNetDown
             size: Theme.iconSizeSmall
+            Layout.leftMargin: 2
+            Layout.rightMargin: 2
         }
         Text {
             visible: root.connected

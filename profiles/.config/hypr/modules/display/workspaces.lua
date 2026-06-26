@@ -65,16 +65,16 @@ hl.window_rule({
 --     border_size = 0,
 --     rounding    = 0,
 -- })
-hl.workspace_rule({ workspace = "1", monitor = "DP-1", default = true })
-hl.workspace_rule({ workspace = "2", monitor = "DP-2", default = true })
-hl.workspace_rule({ workspace = "3", monitor = "DP-3", default = true })
+hl.workspace_rule({ workspace = "1", monitor = "DP-2", default = true,  persistent = true })
+hl.workspace_rule({ workspace = "2", monitor = "DP-1", default = true,  persistent = true })
+hl.workspace_rule({ workspace = "3", monitor = "DP-3", default = true,  persistent = true })
 
-hl.workspace_rule({ workspace = "4", monitor = "DP-1", default = false })
-hl.workspace_rule({ workspace = "5", monitor = "DP-2", default = false })
-hl.workspace_rule({ workspace = "6", monitor = "DP-3", default = false })
+hl.workspace_rule({ workspace = "4", monitor = "DP-2", default = false, persistent = true })
+hl.workspace_rule({ workspace = "5", monitor = "DP-1", default = false, persistent = true })
+hl.workspace_rule({ workspace = "6", monitor = "DP-3", default = false, persistent = true })
 
-hl.workspace_rule({ workspace = "7", monitor = "DP-1", default = false })
-hl.workspace_rule({ workspace = "8", monitor = "DP-2", default = false })
+hl.workspace_rule({ workspace = "7", monitor = "DP-2", default = false })
+hl.workspace_rule({ workspace = "8", monitor = "DP-1", default = false })
 hl.workspace_rule({ workspace = "9", monitor = "DP-3", default = false })
 
 -- See https://wiki.hypr.land/Configuring/Layouts/Dwindle-Layout/ for more
