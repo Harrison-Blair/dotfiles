@@ -277,16 +277,40 @@ def _box_header(title: str, description: str | None = None) -> Text:
     return text
 
 
+def _scroll_top(total: int, cursor: int, top: int, height: int) -> int:
+    """Sticky scroll: return the new top-of-window index keeping cursor visible."""
+    if total <= height:
+        return 0
+    if cursor < top:
+        top = cursor
+    elif cursor >= top + height:
+        top = cursor - height + 1
+    return max(0, min(top, total - height))
+
+
+def _checklist_height(description: str | None) -> int:
+    """Rows available for list items: terminal height minus header, footer, and
+    the two lines reserved for the scroll indicators."""
+    header = 5 if description else 4
+    return max(1, console.height - header - 2 - 2)
+
+
 def _render_checklist(
     nodes: list[Node],
     cursor: int,
+    top: int,
+    height: int,
     title: str,
     info: dict[str, str] | None = None,
     description: str | None = None,
 ) -> Text:
     whole = _config_whole(nodes)
     text = _box_header(title, description)
-    for i, n in enumerate(nodes):
+    end = min(top + height, len(nodes))
+    if top > 0:
+        text.append(f"   ↑ {top} more\n", style="dim")
+    for i in range(top, end):
+        n = nodes[i]
         implied = n.parent_key == ".config" and whole
         glyph = "[-]" if implied else ("[x]" if n.checked else "[ ]")
         label = n.label
@@ -298,6 +322,8 @@ def _render_checklist(
         if info and n.key in info:
             text.append(f"  — {info[n.key]}", style="dim")
         text.append("\n")
+    if end < len(nodes):
+        text.append(f"   ↓ {len(nodes) - end} more\n", style="dim")
     text.append(
         "\n↑/↓ move · space toggle · enter confirm · q cancel",
         style="dim",
@@ -320,7 +346,7 @@ def interactive_select(
 ) -> list[Node] | None:
     if not nodes:
         return []
-    state = {"cursor": 0}
+    state = {"cursor": 0, "top": 0}
 
     def on_key(key: str) -> str | None:
         if key == "up":
@@ -335,10 +361,14 @@ def interactive_select(
             return "cancel"
         return None
 
-    confirmed = _key_loop(
-        lambda: _render_checklist(nodes, state["cursor"], title, info, description),
-        on_key,
-    )
+    def render() -> Text:
+        height = _checklist_height(description)
+        state["top"] = _scroll_top(len(nodes), state["cursor"], state["top"], height)
+        return _render_checklist(
+            nodes, state["cursor"], state["top"], height, title, info, description
+        )
+
+    confirmed = _key_loop(render, on_key)
     return nodes if confirmed else None
 
 

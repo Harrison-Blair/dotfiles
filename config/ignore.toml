@@ -11,6 +11,7 @@ ignore = [
   ".cargo",
   ".docker",
   ".mozilla",
+  ".steam",
   # secrets — keep these out of a synced repo
   ".ssh",
   ".gnupg",
