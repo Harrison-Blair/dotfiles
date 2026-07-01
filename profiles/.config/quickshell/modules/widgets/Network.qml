@@ -18,8 +18,8 @@ Item {
 
     property real downRate: 0          // bytes/sec
     property real upRate: 0
-    property int rxPrev: -1
-    property int txPrev: -1
+    property real rxPrev: -1
+    property real txPrev: -1
 
     // wifi / connection details (for the menu + signal icon)
     property string ssid: ""

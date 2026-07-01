@@ -1,5 +1,8 @@
 <!-- This file is loaded for every Claude Code session, regardless of working directory. -->
 <!-- Add personal preferences, defaults, or guidance that should apply everywhere. -->
+# Commits
+NEVER add yourself as a co-author (no `Co-Authored-By` trailer) on commits I ask you to make.
+
 # Core Tennants
 <!-- From Andrej Karpathy's Guidelines -->
 

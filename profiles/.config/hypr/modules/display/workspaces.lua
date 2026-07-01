@@ -65,6 +65,7 @@ hl.window_rule({
 --     border_size = 0,
 --     rounding    = 0,
 -- })
+hl.workspace_rule({ workspace = "w[tv1]", gaps_out = 60 })
 hl.workspace_rule({ workspace = "1", monitor = "DP-2", default = true,  persistent = true })
 hl.workspace_rule({ workspace = "2", monitor = "DP-1", default = true,  persistent = true })
 hl.workspace_rule({ workspace = "3", monitor = "DP-3", default = true,  persistent = true })
