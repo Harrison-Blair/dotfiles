@@ -1,0 +1,43 @@
+# stenographer configuration
+# See spec/07-configuration.md for the full schema.
+
+[stenographer]
+
+# Hotkey
+hotkey.binding = "KEY_RIGHTCTRL"
+hotkey.toggle_threshold_seconds = 0.5
+hotkey.device = ""
+
+# Audio capture
+audio.sample_rate = 16000
+audio.frames_per_buffer = 1024
+audio.input_device = "pulse"
+
+# ASR
+asr.model = "Systran/faster-whisper-large-v3"
+asr.language = "en"
+asr.beam_size = 10
+asr.compute_type = "int8"
+asr.silence_threshold = 0.35
+asr.mode = "lazy"
+asr.idle_unload_seconds = 300
+
+# Audio feedback
+feedback.volume = 0.6
+feedback.mute = false
+
+# Text output
+output.injection_method = "text"
+output.append_trailing_space = true
+output.max_chars = 4096
+
+# Clipboard
+clipboard.enabled = true
+
+[stenographer.feedback.cues]
+ptt_on = ""
+ptt_off = ""
+toggle_on = ""
+toggle_off = ""
+error = ""
+transcribe_done = ""
