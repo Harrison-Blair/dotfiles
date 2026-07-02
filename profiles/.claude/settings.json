@@ -11,5 +11,6 @@
   "theme": "dark-daltonized",
   "teammateMode": "auto",
   "agentPushNotifEnabled": true,
-  "skipAutoPermissionPrompt": true
+  "skipAutoPermissionPrompt": true,
+  "model": "claude-fable-5[1m]"
 }

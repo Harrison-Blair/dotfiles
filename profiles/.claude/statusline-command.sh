@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
-# Claude Code status line — context window + compaction proximity + rate limits
+# Claude Code status line
+# Layout: ctx: tk / max | 5h: % | W: %
 # JSON is parsed with the system python3 (no jq dependency).
 input=$(cat)
 
 # Extract every field in a single python3 pass. Outputs 9 lines, in order:
 #   model, cw_size, used_pct, input_tokens, cache_write, cache_read,
-#   has_usage, five_pct, five_resets
+#   has_usage, five_pct, week_pct
 # An empty line means the field is absent.
 fields=$(printf '%s' "$input" | python3 -c '
 import sys, json
@@ -16,7 +17,9 @@ except Exception:
 cw = d.get("context_window") or {}
 usage = cw.get("current_usage")
 u = usage or {}
-rl = (d.get("rate_limits") or {}).get("five_hour") or {}
+rl = d.get("rate_limits") or {}
+five = rl.get("five_hour") or {}
+week = rl.get("seven_day") or {}
 def s(v):
     return "" if v is None else v
 print(s((d.get("model") or {}).get("display_name")))
@@ -26,8 +29,8 @@ print(u.get("input_tokens", 0))
 print(u.get("cache_creation_input_tokens", 0))
 print(u.get("cache_read_input_tokens", 0))
 print("no" if usage is None else "yes")
-print(s(rl.get("used_percentage")))
-print(s(rl.get("resets_at")))
+print(s(five.get("used_percentage")))
+print(s(week.get("used_percentage")))
 ')
 
 { read -r model
@@ -38,7 +41,7 @@ print(s(rl.get("resets_at")))
   read -r cache_read
   read -r has_usage
   read -r five_pct
-  read -r five_resets
+  read -r week_pct
 } <<EOF
 $fields
 EOF
@@ -50,67 +53,78 @@ if [ "$has_usage" = "yes" ]; then
   total_ctx_tokens=$(awk "BEGIN { print $input_tokens + $cache_write + $cache_read }")
 fi
 
-# Format token count in K
-tokens_k=""
-if [ -n "$total_ctx_tokens" ] && [ "$total_ctx_tokens" -gt 0 ] 2>/dev/null; then
-  tokens_k=$(awk "BEGIN { printf \"%.0fk\", $total_ctx_tokens / 1000 }")
-fi
+# Format a token count with k/M suffix, rounding sensibly so e.g. 999500
+# rounds up to 1M rather than truncating to 1000k.
+format_count() {
+  awk -v n="$1" 'BEGIN {
+    if (n >= 1000000) {
+      m = n / 1000000
+      rm = int(m * 10 + 0.5) / 10
+      if (rm == int(rm)) printf "%dM", rm
+      else printf "%.1fM", rm
+      exit
+    }
+    rk = int(n / 1000 + 0.5)
+    if (rk >= 1000) {
+      m = rk / 1000
+      if (m == int(m)) printf "%dM", m
+      else printf "%.1fM", m
+    } else {
+      printf "%dk", rk
+    }
+  }'
+}
 
-# Format context window size in K
-cw_k=""
-if [ -n "$cw_size" ]; then
-  cw_k=$(awk "BEGIN { printf \"%.0fk\", $cw_size / 1000 }")
-fi
+parts=()
 
-# Build the context display
-if [ -n "$tokens_k" ] && [ -n "$cw_k" ]; then
-  ctx_part="${tokens_k} / ${cw_k}"
+# ctx: tk/max — colored by compaction proximity (used_percentage thresholds)
+if [ -n "$total_ctx_tokens" ] && [ -n "$cw_size" ]; then
+  ctx_str="$(format_count "$total_ctx_tokens") / $(format_count "$cw_size")"
 
   if [ -n "$used_pct" ]; then
     used_int=$(printf '%.0f' "$used_pct")
 
-    # Color the compaction proximity indicator
     # Claude Code compacts around 85-90% used; warn at >= 70%, danger at >= 85%
     if [ "$used_int" -ge 85 ]; then
-      # Red — imminent compaction
-      compact_label=$(printf '\033[31m(%d%% — compact soon)\033[0m' "$used_int")
+      ctx_color='\033[31m'   # Red — imminent compaction
     elif [ "$used_int" -ge 70 ]; then
-      # Yellow — getting close
-      compact_label=$(printf '\033[33m(%d%%)\033[0m' "$used_int")
+      ctx_color='\033[33m'   # Yellow — getting close
     else
-      # Dim — no concern
-      compact_label=$(printf '\033[2m(%d%%)\033[0m' "$used_int")
+      ctx_color='\033[2m'    # Dim — no concern
     fi
-
-    printf '\033[36mctx:\033[0m %s %s' "$ctx_part" "$compact_label"
-  else
-    printf '\033[36mctx:\033[0m %s' "$ctx_part"
+    ctx_str=$(printf "${ctx_color}%s\033[0m" "$ctx_str")
   fi
+
+  parts+=("$(printf '\033[36mctx:\033[0m %s' "$ctx_str")")
 elif [ -n "$model" ]; then
-  printf '\033[2m%s\033[0m' "$model"
+  parts+=("$(printf '\033[2m%s\033[0m' "$model")")
 fi
 
-# Rate limit section (5-hour session limit)
-if [ -n "$five_pct" ]; then
-  five_int=$(printf '%.0f' "$five_pct")
-  remaining_int=$((100 - five_int))
-
-  # Color based on how much is used
-  if [ "$five_int" -ge 90 ]; then
-    limit_color='\033[31m'   # Red — nearly exhausted
-  elif [ "$five_int" -ge 70 ]; then
-    limit_color='\033[33m'   # Yellow — getting low
+# Rate limit segments: raw used-percentage only, colored by usage thresholds.
+rate_part() {
+  local label="$1" pct="$2"
+  [ -z "$pct" ] && return
+  local pct_int color
+  pct_int=$(printf '%.0f' "$pct")
+  if [ "$pct_int" -ge 90 ]; then
+    color='\033[31m'   # Red — nearly exhausted
+  elif [ "$pct_int" -ge 70 ]; then
+    color='\033[33m'   # Yellow — getting low
   else
-    limit_color='\033[32m'   # Green — plenty left
+    color='\033[32m'   # Green — plenty left
   fi
+  printf '\033[36m%s:\033[0m '"${color}"'%d%%\033[0m' "$label" "$pct_int"
+}
 
-  # Format reset time as HH:MM if available
-  reset_str=""
-  if [ -n "$five_resets" ]; then
-    reset_str=$(date -d "@${five_resets}" +"%H:%M" 2>/dev/null || date -r "${five_resets}" +"%H:%M" 2>/dev/null)
-    [ -n "$reset_str" ] && reset_str=" resets ${reset_str}"
+p=$(rate_part "5h" "$five_pct");  [ -n "$p" ] && parts+=("$p")
+p=$(rate_part "W" "$week_pct");   [ -n "$p" ] && parts+=("$p")
+
+out=""
+for i in "${!parts[@]}"; do
+  if [ "$i" -eq 0 ]; then
+    out="${parts[$i]}"
+  else
+    out="${out} | ${parts[$i]}"
   fi
-
-  printf '  \033[36m5h:\033[0m '"${limit_color}"'%d%% used (%d%% left)\033[0m\033[2m%s\033[0m' \
-    "$five_int" "$remaining_int" "$reset_str"
-fi
+done
+printf '%s' "$out"
