@@ -155,7 +155,7 @@ Item {
         Text {
             visible: root.connected
             text: root.human(root.downRate)
-            color: Theme.fg
+            color: "#ff5f5f"
             font.family: Theme.fontFamily
             font.pixelSize: Theme.fontSize
             Layout.preferredWidth: rateMetrics.width
@@ -164,6 +164,7 @@ Item {
         Icon {
             visible: root.connected
             text: Theme.icoNetDown
+            color: "#ff5f5f"
             size: Theme.iconSizeSmall
             Layout.leftMargin: 2
             Layout.rightMargin: 2
@@ -171,7 +172,7 @@ Item {
         Text {
             visible: root.connected
             text: root.human(root.upRate)
-            color: Theme.fg
+            color: "#5fd75f"
             font.family: Theme.fontFamily
             font.pixelSize: Theme.fontSize
             Layout.preferredWidth: rateMetrics.width
@@ -180,6 +181,7 @@ Item {
         Icon {
             visible: root.connected
             text: Theme.icoNetUp
+            color: "#5fd75f"
             size: Theme.iconSizeSmall
         }
     }

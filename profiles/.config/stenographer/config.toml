@@ -12,6 +12,7 @@ hotkey.device = ""
 audio.sample_rate = 16000
 audio.frames_per_buffer = 1024
 audio.input_device = "pulse"
+audio.silence_duration_seconds = 0.8
 
 # ASR
 asr.model = "Systran/faster-whisper-large-v3"

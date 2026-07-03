@@ -22,7 +22,9 @@ PanelWindow {
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.verticalCenter: parent.verticalCenter
 
-        Workspaces {}
+        Scratchpad { id: scratchpad }
+        Separator { visible: scratchpad.present }
+        Workspaces { screen: bar.screen }
         Separator {}
         Network {}
         Separator {}
@@ -34,11 +36,15 @@ PanelWindow {
         Separator { visible: battery.present }
         Battery { id: battery }
         Separator {}
+        AiUsage {}
+        Separator {}
         Clock {}
         Separator {}
         Audio {}
         Separator {}
         Screenshot {}
+        Separator {}
+        Notification {}
         Separator {}
         PowerMenu {}
     }

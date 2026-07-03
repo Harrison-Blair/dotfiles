@@ -414,7 +414,7 @@
         "url": "https://github.com/awslabs/agent-plugins.git",
         "path": "plugins/aws-transform",
         "ref": "main",
-        "sha": "283d86f528c2d2269928ab77f707e659a7e597fe"
+        "sha": "23dc619d35f848fd03b12d45d0e16c191d40d1e6"
       },
       "homepage": "https://github.com/awslabs/agent-plugins"
     },
@@ -567,7 +567,7 @@
         "url": "https://github.com/carta/plugins.git",
         "path": "plugins/carta-cap-table",
         "ref": "main",
-        "sha": "0f7d5f3f1c71ae5d5715494621764fda0fbb0776"
+        "sha": "74dcec2b733f150c11b6d7c59b7a37e63da79a82"
       },
       "homepage": "https://carta.com"
     },
@@ -599,7 +599,7 @@
         "url": "https://github.com/carta/plugins.git",
         "path": "plugins/carta-investors",
         "ref": "main",
-        "sha": "0f7d5f3f1c71ae5d5715494621764fda0fbb0776"
+        "sha": "74dcec2b733f150c11b6d7c59b7a37e63da79a82"
       },
       "homepage": "https://carta.com"
     },
@@ -920,7 +920,7 @@
       "source": {
         "source": "url",
         "url": "https://github.com/get-convex/convex-backend-skill.git",
-        "sha": "1c8025f558df0cd3d2f650bca20f1c93d3ab2aa3"
+        "sha": "c7a17c89834a5755599bc9802445925f6586b09c"
       },
       "homepage": "https://github.com/get-convex/convex-backend-skill",
       "keywords": [
@@ -1298,7 +1298,7 @@
       "source": {
         "source": "url",
         "url": "https://github.com/voxel51/fiftyone-skills.git",
-        "sha": "d34365bd643b889d67dafcc120a8c525699fb54c"
+        "sha": "b64f982e06a2831f934ab6c42298d4d1c4fe9852"
       },
       "homepage": "https://docs.voxel51.com/"
     },
@@ -1550,7 +1550,7 @@
       "source": {
         "source": "url",
         "url": "https://github.com/heygen-com/hyperframes.git",
-        "sha": "a7c3cc7d689b13c5bb96559f9bad713205edb194"
+        "sha": "a59ff0d91b4074bd16b7e4d41fb9a9ffbc9eab8e"
       },
       "homepage": "https://hyperframes.heygen.com"
     },
@@ -1992,7 +1992,7 @@
         "url": "https://github.com/awslabs/startups.git",
         "path": "migrate/plugins/migration-to-aws",
         "ref": "main",
-        "sha": "5c85895eef7fab5bc0839a0704f940a726c55b10"
+        "sha": "b6843251c4a3f710cdd093de0f2f895989d93ae2"
       },
       "homepage": "https://github.com/awslabs/startups"
     },
@@ -2143,7 +2143,7 @@
         "url": "https://github.com/NVIDIA/skills.git",
         "path": "plugins/nvidia-skills",
         "ref": "main",
-        "sha": "55f8f7a5a4d77ed14f57e74c786fa04d193b6541"
+        "sha": "63c02e122e3c9cbf85e2dbc4d3b56425a5465926"
       },
       "homepage": "https://github.com/NVIDIA/skills"
     },
@@ -2221,7 +2221,7 @@
         "url": "https://github.com/growthxai/output.git",
         "path": "coding_assistants/claude/plugins/outputai",
         "ref": "main",
-        "sha": "38ae07ca87a97251f6e44886c4f3737c06960546"
+        "sha": "9d7a8708d9f9d13f91895263f90f583568239828"
       },
       "homepage": "https://output.ai"
     },
@@ -2852,7 +2852,7 @@
         "url": "https://github.com/getsentry/cli.git",
         "path": "plugins/sentry-cli",
         "ref": "main",
-        "sha": "332b27f562b4f992133fb39e76304c1327706668"
+        "sha": "4110b3a53ba1a3892a059dd3ca2b6ab67b3298f7"
       },
       "homepage": "https://sentry.io"
     },
@@ -2939,7 +2939,7 @@
       "source": {
         "source": "url",
         "url": "https://github.com/slackapi/slack-mcp-plugin.git",
-        "sha": "44af86dab9ccc227a6ae6c4371727185cf530e6e"
+        "sha": "9635a2f7741ad30f86d00d6836a1ab6dd0a907b9"
       },
       "homepage": "https://github.com/slackapi/slack-mcp-plugin/tree/main"
     },
@@ -3063,7 +3063,7 @@
       "source": {
         "source": "url",
         "url": "https://github.com/obra/superpowers.git",
-        "sha": "f268f7c953744036f0fa7e9d4b73535c04e57cb8"
+        "sha": "d884ae04edebef577e82ff7c4e143debd0bbec99"
       },
       "homepage": "https://github.com/obra/superpowers.git"
     },

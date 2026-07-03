@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # Claude Code status line
-# Layout: ctx: tk / max | 5h: % | W: %
+# Layout: tk / max | 5h: % [H:M] | w: % [d:h:m]
 # JSON is parsed with the system python3 (no jq dependency).
 input=$(cat)
 
-# Extract every field in a single python3 pass. Outputs 9 lines, in order:
+# Extract every field in a single python3 pass. Outputs 11 lines, in order:
 #   model, cw_size, used_pct, input_tokens, cache_write, cache_read,
-#   has_usage, five_pct, week_pct
+#   has_usage, five_pct, week_pct, five_reset, week_reset
 # An empty line means the field is absent.
 fields=$(printf '%s' "$input" | python3 -c '
 import sys, json
@@ -31,6 +31,8 @@ print(u.get("cache_read_input_tokens", 0))
 print("no" if usage is None else "yes")
 print(s(five.get("used_percentage")))
 print(s(week.get("used_percentage")))
+print(s(five.get("resets_at")))
+print(s(week.get("resets_at")))
 ')
 
 { read -r model
@@ -42,6 +44,8 @@ print(s(week.get("used_percentage")))
   read -r has_usage
   read -r five_pct
   read -r week_pct
+  read -r five_reset
+  read -r week_reset
 } <<EOF
 $fields
 EOF
@@ -95,16 +99,32 @@ if [ -n "$total_ctx_tokens" ] && [ -n "$cw_size" ]; then
     ctx_str=$(printf "${ctx_color}%s\033[0m" "$ctx_str")
   fi
 
-  parts+=("$(printf '\033[36mctx:\033[0m %s' "$ctx_str")")
+  parts+=("$ctx_str")
 elif [ -n "$model" ]; then
   parts+=("$(printf '\033[2m%s\033[0m' "$model")")
 fi
 
-# Rate limit segments: raw used-percentage only, colored by usage thresholds.
+# Format a countdown from now until an absolute unix-epoch reset time. Style
+# "hm" renders H:M (hours accumulate past 24); style "dhm" renders d:h:m. Minutes
+# (and hours in dhm) are zero-padded. A past/zero delta renders as all zeros.
+now=$(date +%s)
+fmt_reset() {
+  awk -v target="$1" -v now="$now" -v style="$2" 'BEGIN {
+    d = target - now
+    if (d < 0) d = 0
+    if (style == "dhm")
+      printf "%d:%02d:%02d", int(d / 86400), int((d % 86400) / 3600), int((d % 3600) / 60)
+    else
+      printf "%d:%02d", int(d / 3600), int((d % 3600) / 60)
+  }'
+}
+
+# Rate limit segments: used-percentage colored by usage thresholds, followed by
+# a "[H:M]" countdown to the window reset when a reset time is present.
 rate_part() {
-  local label="$1" pct="$2"
+  local label="$1" pct="$2" reset="$3" style="$4"
   [ -z "$pct" ] && return
-  local pct_int color
+  local pct_int color seg
   pct_int=$(printf '%.0f' "$pct")
   if [ "$pct_int" -ge 90 ]; then
     color='\033[31m'   # Red — nearly exhausted
@@ -113,11 +133,15 @@ rate_part() {
   else
     color='\033[32m'   # Green — plenty left
   fi
-  printf '\033[36m%s:\033[0m '"${color}"'%d%%\033[0m' "$label" "$pct_int"
+  seg=$(printf '\033[36m%s:\033[0m '"${color}"'%d%%\033[0m' "$label" "$pct_int")
+  if [ -n "$reset" ]; then
+    seg="$seg$(printf ' \033[2m[%s]\033[0m' "$(fmt_reset "$reset" "$style")")"
+  fi
+  printf '%s' "$seg"
 }
 
-p=$(rate_part "5h" "$five_pct");  [ -n "$p" ] && parts+=("$p")
-p=$(rate_part "W" "$week_pct");   [ -n "$p" ] && parts+=("$p")
+p=$(rate_part "5h" "$five_pct" "$five_reset" "hm");   [ -n "$p" ] && parts+=("$p")
+p=$(rate_part "w" "$week_pct" "$week_reset" "dhm");   [ -n "$p" ] && parts+=("$p")
 
 out=""
 for i in "${!parts[@]}"; do

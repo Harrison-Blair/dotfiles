@@ -4,6 +4,8 @@
 
 local mainMod = "SUPER" -- Sets "Windows" key as main modifier
 
+local gaps = require("modules.input.gaps")
+
 -- Example binds, see https://wiki.hypr.land/Configuring/Basics/Binds/ for more
 hl.bind(mainMod .. " + T", hl.dsp.exec_cmd(terminal))
 local closeWindowBind = hl.bind(mainMod .. " + C", hl.dsp.window.close())
@@ -18,6 +20,11 @@ hl.bind(mainMod .. " + V", hl.dsp.exec_cmd(string.format("clipvault list | %s -d
 hl.bind(mainMod .. " + D", hl.dsp.exec_cmd(string.format("%s -show run", menu)))
 hl.bind(mainMod .. " + P", hl.dsp.window.pseudo())
 hl.bind(mainMod .. " + J", hl.dsp.layout("togglesplit"))    -- dwindle only
+
+-- Cycle per-workspace gaps: 5/10 -> 30/60 -> 45/90 (SHIFT: inner only, CTRL: outer only)
+hl.bind(mainMod .. " + G",         gaps.cycle_both)
+hl.bind(mainMod .. " + SHIFT + G", gaps.cycle_inner)
+hl.bind(mainMod .. " + CTRL + G",  gaps.cycle_outer)
 
 -- Move focus with mainMod + arrow keys
 hl.bind(mainMod .. " + left",  hl.dsp.focus({ direction = "left" }))

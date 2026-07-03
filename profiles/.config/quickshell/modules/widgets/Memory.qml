@@ -1,3 +1,4 @@
+import Quickshell
 import QtQuick
 import QtQuick.Layouts
 import Quickshell.Io
@@ -90,6 +91,7 @@ Item {
         anchors.fill: parent
         hoverEnabled: true
         cursorShape: Qt.PointingHandCursor
+        onClicked: Quickshell.execDetached(["kitty", "-e", "btop"])
         onEntered: menu.anchorHovered = true
         onExited: menu.anchorHovered = false
     }
@@ -110,11 +112,6 @@ Item {
             color: Theme.fg
             font.family: Theme.fontFamily
             font.pixelSize: Theme.fontSize
-        }
-        MenuButton {
-            label: "Open htop"
-            command: ["kitty", "-e", "htop"]
-            onTriggered: menu.visible = false
         }
     }
 }

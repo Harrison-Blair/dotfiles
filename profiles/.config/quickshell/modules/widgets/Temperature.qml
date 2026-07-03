@@ -1,3 +1,4 @@
+import Quickshell
 import QtQuick
 import QtQuick.Layouts
 import Quickshell.Io
@@ -99,9 +100,9 @@ Item {
         }
 
         const head = []
-        if (cpuMax !== null) head.push({ icon: Theme.icoSensCpu, temp: Math.round(cpuMax), crit: cpuCrit })
-        if (gpuTemp !== null) head.push({ icon: gpuIcon, temp: Math.round(gpuTemp), crit: gpuCrit })
-        if (ssdMax !== null) head.push({ icon: Theme.icoSensNvme, temp: Math.round(ssdMax), crit: ssdCrit })
+        if (cpuMax !== null) head.push({ icon: Theme.icoSensCpu, temp: Math.round(cpuMax), crit: cpuCrit, color: "#d93a3a" })
+        if (gpuTemp !== null) head.push({ icon: gpuIcon, temp: Math.round(gpuTemp), crit: gpuCrit, color: "#d93a3a" })
+        if (ssdMax !== null) head.push({ icon: Theme.icoSensNvme, temp: Math.round(ssdMax), crit: ssdCrit, color: Theme.fg })
 
         root.groups = groups
         root.headline = head
@@ -168,7 +169,7 @@ Item {
                 spacing: 5
                 Icon {
                     text: modelData.icon
-                    color: modelData.crit ? Theme.crit : Theme.fg
+                    color: modelData.crit ? Theme.crit : modelData.color
                 }
                 Text {
                     text: modelData.temp + "°"
@@ -184,6 +185,7 @@ Item {
         anchors.fill: parent
         hoverEnabled: true
         cursorShape: Qt.PointingHandCursor
+        onClicked: Quickshell.execDetached(["kitty", "-e", "btop"])
         onEntered: menu.anchorHovered = true
         onExited: menu.anchorHovered = false
     }
@@ -198,11 +200,6 @@ Item {
             font.family: Theme.fontFamily
             font.pixelSize: Theme.fontSize - 1
             lineHeight: 1.15
-        }
-        MenuButton {
-            label: "Open sensors"
-            command: ["kitty", "-e", "watch", "-n", "1", "sensors"]
-            onTriggered: menu.visible = false
         }
     }
 }

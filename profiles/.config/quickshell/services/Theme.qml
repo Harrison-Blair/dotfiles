@@ -36,6 +36,8 @@ Singleton {
     readonly property color wifiBad: "#dd532e"                  // bad signal red
     readonly property color accent: Qt.rgba(175/255, 75/255, 175/255, 1.0)
     readonly property color accentActive: Qt.rgba(175/255, 75/255, 175/255, 0.75)
+    readonly property color aiClaude: "#d97757"               // Claude brand orange
+    readonly property color aiCursor: "#cccccc"               // Cursor gray/white
 
     // --- Sensor critical thresholds (°C), from scripts/sensors.sh ---
     readonly property int critCpu: 85
@@ -68,8 +70,12 @@ Singleton {
 
     readonly property string icoMem: String.fromCodePoint(0xEFC5)
     readonly property string icoCpu: String.fromCodePoint(0xF4BC)
+    readonly property string icoAi: String.fromCodePoint(0xF09D1)        // md brain
+    readonly property string icoOpencode: String.fromCodePoint(0xF018D)  // md console
     readonly property string icoReload: String.fromCodePoint(0xF00E2)
     readonly property string icoScreenshot: String.fromCodePoint(0xF0100)  // md camera
+    readonly property string icoNotification: String.fromCodePoint(0xF009A)  // md bell
+    readonly property string icoScratchpad: String.fromCodePoint(0xF0068)  // md auto-fix (magic wand)
 
     // session / power menu (md glyphs)
     readonly property string icoPower:    String.fromCodePoint(0xF0425)  // md power (bar button)
