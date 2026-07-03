@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # Claude Code status line
-# Layout: tk / max | 5h: % [H:M] | w: % [d:h:m]
+# Layout: model: effort | tk / max | 5h: % [H:M] | w: % [d:h:m]
 # JSON is parsed with the system python3 (no jq dependency).
 input=$(cat)
 
-# Extract every field in a single python3 pass. Outputs 11 lines, in order:
-#   model, cw_size, used_pct, input_tokens, cache_write, cache_read,
+# Extract every field in a single python3 pass. Outputs 12 lines, in order:
+#   model, effort, cw_size, used_pct, input_tokens, cache_write, cache_read,
 #   has_usage, five_pct, week_pct, five_reset, week_reset
 # An empty line means the field is absent.
 fields=$(printf '%s' "$input" | python3 -c '
@@ -23,6 +23,7 @@ week = rl.get("seven_day") or {}
 def s(v):
     return "" if v is None else v
 print(s((d.get("model") or {}).get("display_name")))
+print(s((d.get("effort") or {}).get("level")))
 print(s(cw.get("context_window_size")))
 print(s(cw.get("used_percentage")))
 print(u.get("input_tokens", 0))
@@ -36,6 +37,7 @@ print(s(week.get("resets_at")))
 ')
 
 { read -r model
+  read -r effort
   read -r cw_size
   read -r used_pct
   read -r input_tokens
@@ -81,10 +83,16 @@ format_count() {
 
 parts=()
 
+# model: effort — always first
+if [ -n "$model" ]; then
+  model_str=$(printf '\033[36m%s\033[0m' "$model")
+  [ -n "$effort" ] && model_str="$model_str$(printf '\033[2m: %s\033[0m' "$effort")"
+  parts+=("$model_str")
+fi
+
 # ctx: tk/max — colored by compaction proximity (used_percentage thresholds)
 if [ -n "$total_ctx_tokens" ] && [ -n "$cw_size" ]; then
-  ctx_str="$(format_count "$total_ctx_tokens") / $(format_count "$cw_size")"
-
+  ctx_color='\033[36m'       # Cyan — no concern
   if [ -n "$used_pct" ]; then
     used_int=$(printf '%.0f' "$used_pct")
 
@@ -93,15 +101,11 @@ if [ -n "$total_ctx_tokens" ] && [ -n "$cw_size" ]; then
       ctx_color='\033[31m'   # Red — imminent compaction
     elif [ "$used_int" -ge 70 ]; then
       ctx_color='\033[33m'   # Yellow — getting close
-    else
-      ctx_color='\033[2m'    # Dim — no concern
     fi
-    ctx_str=$(printf "${ctx_color}%s\033[0m" "$ctx_str")
   fi
+  ctx_str=$(printf "${ctx_color}%s\033[0m\033[2m / %s\033[0m" "$(format_count "$total_ctx_tokens")" "$(format_count "$cw_size")")
 
   parts+=("$ctx_str")
-elif [ -n "$model" ]; then
-  parts+=("$(printf '\033[2m%s\033[0m' "$model")")
 fi
 
 # Format a countdown from now until an absolute unix-epoch reset time. Style

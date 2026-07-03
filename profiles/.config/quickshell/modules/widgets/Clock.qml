@@ -26,7 +26,7 @@ Item {
         return "UTC " + pad(d.getUTCHours()) + ":" + pad(d.getUTCMinutes()) + ":" + pad(d.getUTCSeconds())
     }
     function localTime() {
-        return "EST " + Qt.formatDateTime(root.now, "HH:mm:ss")
+        return Qt.formatDateTime(root.now, "t") + " " + Qt.formatDateTime(root.now, "HH:mm:ss")
     }
     function utcDateStr() {
         const days = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"]

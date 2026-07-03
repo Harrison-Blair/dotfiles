@@ -8,6 +8,9 @@ import qs.modules.widgets
 PanelWindow {
     id: bar
 
+    // Portrait screens (rotated monitors) are too narrow for the full widget row.
+    readonly property bool portrait: screen.height > screen.width
+
     anchors {
         top: true
         left: true
@@ -22,27 +25,27 @@ PanelWindow {
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.verticalCenter: parent.verticalCenter
 
-        Scratchpad { id: scratchpad }
-        Separator { visible: scratchpad.present }
+        Scratchpad { id: scratchpad; visible: present && !bar.portrait }
+        Separator { visible: scratchpad.present && !bar.portrait }
         Workspaces { screen: bar.screen }
-        Separator {}
-        Network {}
-        Separator {}
-        Memory {}
-        Separator {}
-        Cpu {}
-        Separator {}
-        Temperature {}
-        Separator { visible: battery.present }
-        Battery { id: battery }
-        Separator {}
-        AiUsage {}
+        Separator { visible: !bar.portrait }
+        Network { visible: !bar.portrait }
+        Separator { visible: !bar.portrait }
+        Memory { visible: !bar.portrait }
+        Separator { visible: !bar.portrait }
+        Cpu { visible: !bar.portrait }
+        Separator { visible: !bar.portrait }
+        Temperature { visible: !bar.portrait }
+        Separator { visible: battery.present && !bar.portrait }
+        Battery { id: battery; visible: present && !bar.portrait }
+        Separator { visible: !bar.portrait }
+        AiUsage { visible: !bar.portrait }
         Separator {}
         Clock {}
         Separator {}
         Audio {}
-        Separator {}
-        Screenshot {}
+        Separator { visible: !bar.portrait }
+        Screenshot { visible: !bar.portrait }
         Separator {}
         Notification {}
         Separator {}

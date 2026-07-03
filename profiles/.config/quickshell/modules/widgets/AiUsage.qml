@@ -1,23 +1,22 @@
 import QtQuick
 import QtQuick.Layouts
-import Quickshell
-import Quickshell.Io
 import qs.services
+import qs.services as Services
 import qs.components
 
-// AI usage at a glance (Claude Code / OpenCode / Cursor). scripts/ai-usage.py
-// aggregates local transcripts, the OpenCode db and vendor APIs into one JSON
-// blob every 60s (API calls throttled to 5min inside the script). Bar shows
-// one segment per provider: session% / weekly% / monthly% + 30-day cost, in
-// the provider's base color; hover popup has limits/resets and day/week/month
-// cost + token breakdowns.
+// AI usage at a glance (Claude Code / OpenCode / Cursor). The shared
+// services/AiUsage.qml singleton runs scripts/ai-usage.py every 60s (API
+// calls throttled to 5min inside the script) and feeds all bar instances.
+// Bar shows one segment per provider: session% / weekly% / monthly% +
+// 30-day cost, in the provider's base color; hover popup has limits/resets
+// and day/week/month cost + token breakdowns.
 Item {
     id: root
     implicitWidth: row.implicitWidth
     implicitHeight: Theme.groupHeight
     Layout.alignment: Qt.AlignVCenter
 
-    property var stats: null
+    readonly property var stats: Services.AiUsage.stats
 
     function fmtUsd(v) {
         return (v === undefined || v === null) ? "$--" : "$" + v.toFixed(2)
@@ -35,6 +34,17 @@ Item {
         const hm = d.toLocaleTimeString(Qt.locale(), "HH:mm")
         return d.toDateString() === new Date().toDateString()
             ? hm : d.toLocaleDateString(Qt.locale(), "ddd") + " " + hm
+    }
+    // ISO timestamp -> "in 2h 14m" / "in 3d 5h" countdown from now.
+    function fmtCountdown(iso) {
+        if (!iso) return "--"
+        let ms = new Date(iso).getTime() - Date.now()
+        if (ms <= 0) return "now"
+        const m = Math.floor(ms / 60000)
+        if (m < 60) return "in " + m + "m"
+        const h = Math.floor(m / 60)
+        if (h < 24) return "in " + h + "h " + (m % 60) + "m"
+        return "in " + Math.floor(h / 24) + "d " + (h % 24) + "h"
     }
 
     // One percentage, warn/crit-colored; dimmed when the provider is stale.
@@ -83,8 +93,11 @@ Item {
         const lim = root.stats.opencode.limits
         if (!lim) return "no limit data"
         return "5h      " + (lim.session_pct + "%").padStart(4) + "   " + fmtUsd(lim.session_usd) + " / $12"
+            + "   resets " + fmtCountdown(lim.session_resets_at)
             + "\nWeek    " + (lim.week_pct + "%").padStart(4) + "   " + fmtUsd(lim.week_usd) + " / $30"
+            + "   resets " + fmtCountdown(lim.week_resets_at)
             + "\nMonth   " + (lim.month_pct + "%").padStart(4) + "   " + fmtUsd(lim.month_usd) + " / $60"
+            + "   resets " + fmtCountdown(lim.month_resets_at)
     }
     function cursorLimitsBlock() {
         const lim = root.stats.cursor.limits
@@ -94,23 +107,6 @@ Item {
             s += "   " + fmtUsd(lim.plan_used_usd) + " / " + fmtUsd(lim.plan_limit_usd)
         s += "   renews " + fmtReset(lim.cycle_end)
         return s
-    }
-
-    Process {
-        id: proc
-        command: ["python3", Quickshell.env("HOME") + "/.config/quickshell/scripts/ai-usage.py"]
-        stdout: StdioCollector {
-            onStreamFinished: {
-                try { root.stats = JSON.parse(this.text) } catch (e) {}
-            }
-        }
-    }
-    Timer {
-        interval: 60000
-        running: true
-        repeat: true
-        triggeredOnStart: true
-        onTriggered: if (!proc.running) proc.running = true
     }
 
     RowLayout {

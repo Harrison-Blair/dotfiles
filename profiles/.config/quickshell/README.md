@@ -33,9 +33,10 @@ for Arch.
 | Audio.qml | `Quickshell.Services.Pipewire` + launches `pavucontrol` | `pipewire`, `wireplumber`, `pavucontrol` |
 | Battery.qml | `Quickshell.Services.UPower` | `upower` |
 | Network.qml | `nmcli` / `nmtui` | `networkmanager` |
-| Screenshot.qml | `grim -g "$(slurp)"` | `grim`, `slurp` |
+| Screenshot.qml | `grim -g "$(slurp)" - \| swappy -f -` | `grim`, `slurp`, `swappy` |
 | Temperature.qml | `sensors -j` | `lm_sensors` |
-| Cpu/Memory/Network/Temperature menus | `kitty -e htop` / `nmtui` / `watch sensors` | `kitty`, `htop` (`watch` ← `procps-ng`, base) |
+| Cpu/Memory/Network/Temperature menus | `kitty -e btop` / `nmtui` / `watch sensors` | `kitty`, `btop` (`watch` ← `procps-ng`, base) |
+| Notification.qml | `swaync-client -t -sw` | `swaync` |
 | PowerMenu.qml | `loginctl`, `systemctl` (logout/reboot/shutdown) | `polkit` (active-session actions; usually already present) |
 | greeter + lock | greetd greeter, PAM lock | `greetd`, `cage`, `pam` (base) — see `session-setup/` |
 

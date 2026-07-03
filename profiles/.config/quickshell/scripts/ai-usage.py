@@ -78,6 +78,14 @@ def local_dates(days):
     return {str(today - timedelta(days=i)) for i in range(days)}
 
 
+def window_resets_at(oldest_ms, hours):
+    """Local "resets at" ISO for a rolling window: when the oldest in-window
+    request ages out. None when the window is empty."""
+    if not oldest_ms:
+        return None
+    return datetime.fromtimestamp((oldest_ms + hours * 3600_000) / 1000).strftime("%Y-%m-%dT%H:%M:%S")
+
+
 # --- Claude Code -------------------------------------------------------------
 
 def claude_price(model):
@@ -312,22 +320,35 @@ def get_cursor(state, now):
 
 # --- OpenCode ----------------------------------------------------------------
 
-def get_opencode(now):
+def get_opencode(state, now):
+    """Incremental scan of the opencode db.
+
+    All widget windows are <=30 days, so the cache only keeps a compact
+    per-message record for the last 30 days: {id: [created_ms, cost, input,
+    output, cache_read, cache_write, is_go]}, plus a time_updated cursor.
+    Each run reads only rows updated since the cursor (streaming messages
+    bump time_updated, so in-flight rows are re-read until final) and
+    aggregates the windows from the cache in memory.
+    """
     usage = {w: dict(EMPTY_WINDOW) for w in ("day", "week", "month")}
     db = os.path.join(HOME, ".local", "share", "opencode", "opencode.db")
+    oc = state.setdefault("opencode_scan", {"cursor": 0, "msgs": {}})
+    now_ms = now * 1000
+    month_ago_ms = now_ms - 30 * 86400_000
     try:
         # mode=ro (not immutable): the db is live WAL, read-only is correct.
         con = sqlite3.connect("file:%s?mode=ro" % db, uri=True, timeout=2)
-        rows = con.execute("SELECT data FROM message").fetchall()
+        rows = con.execute(
+            "SELECT id, time_updated, data FROM message"
+            " WHERE time_updated > ? AND time_created >= ?",
+            (oc["cursor"], month_ago_ms)).fetchall()
         con.close()
     except sqlite3.Error as e:
         return {"status": "error", "error": "opencode db: " + type(e).__name__,
                 "usage": usage, "limits": None}
-    windows = {"day": local_dates(1), "week": local_dates(7), "month": local_dates(30)}
-    now_ms = now * 1000
-    # Rolling opencode-go spend for the Go plan limit windows (5h/7d/30d).
-    go_spend = [0.0, 0.0, 0.0]
-    for (raw,) in rows:
+    for mid, updated, raw in rows:
+        if updated > oc["cursor"]:
+            oc["cursor"] = updated
         try:
             msg = json.loads(raw)
         except ValueError:
@@ -337,23 +358,42 @@ def get_opencode(now):
         created = (msg.get("time") or {}).get("created")
         if not created:
             continue
-        cost = msg.get("cost") or 0
-        if msg.get("providerID") == "opencode-go":
+        tok = msg.get("tokens") or {}
+        cache = tok.get("cache") or {}
+        oc["msgs"][mid] = [
+            created,
+            msg.get("cost") or 0,
+            tok.get("input") or 0,
+            (tok.get("output") or 0) + (tok.get("reasoning") or 0),
+            cache.get("read") or 0,
+            cache.get("write") or 0,
+            1 if msg.get("providerID") == "opencode-go" else 0,
+        ]
+    oc["msgs"] = {mid: m for mid, m in oc["msgs"].items() if m[0] >= month_ago_ms}
+
+    windows = {"day": local_dates(1), "week": local_dates(7), "month": local_dates(30)}
+    # Rolling opencode-go spend for the Go plan limit windows (5h/7d/30d).
+    go_spend = [0.0, 0.0, 0.0]
+    # Oldest in-window request per window; the window begins to free up at
+    # oldest + window duration (a local "resets at" approximation).
+    go_oldest = [None, None, None]
+    for created, cost, tin, tout, cread, cwrite, is_go in oc["msgs"].values():
+        if is_go:
             for i, hours in enumerate(OPENCODE_GO_WINDOWS_H):
                 if created >= now_ms - hours * 3600_000:
                     go_spend[i] += cost
+                    if go_oldest[i] is None or created < go_oldest[i]:
+                        go_oldest[i] = created
         date = str(datetime.fromtimestamp(created / 1000).date())
-        tok = msg.get("tokens") or {}
-        cache = tok.get("cache") or {}
         for w, dates in windows.items():
             if date not in dates:
                 continue
             agg = usage[w]
             agg["cost"] += cost
-            agg["input"] += tok.get("input") or 0
-            agg["output"] += (tok.get("output") or 0) + (tok.get("reasoning") or 0)
-            agg["cache_read"] += cache.get("read") or 0
-            agg["cache_write"] += cache.get("write") or 0
+            agg["input"] += tin
+            agg["output"] += tout
+            agg["cache_read"] += cread
+            agg["cache_write"] += cwrite
     for agg in usage.values():
         agg["cost"] = round(agg["cost"], 2)
     # Local approximation of the Go plan limits: only counts this machine's usage.
@@ -364,6 +404,9 @@ def get_opencode(now):
         "session_usd": round(go_spend[0], 2),
         "week_usd": round(go_spend[1], 2),
         "month_usd": round(go_spend[2], 2),
+        "session_resets_at": window_resets_at(go_oldest[0], OPENCODE_GO_WINDOWS_H[0]),
+        "week_resets_at": window_resets_at(go_oldest[1], OPENCODE_GO_WINDOWS_H[1]),
+        "month_resets_at": window_resets_at(go_oldest[2], OPENCODE_GO_WINDOWS_H[2]),
     }
     return {"status": "ok", "error": None, "usage": usage, "limits": limits}
 
@@ -381,7 +424,7 @@ def main():
         "generated_at": int(now),
         "claude": get_claude(state, now),
         "cursor": get_cursor(state, now),
-        "opencode": get_opencode(now),
+        "opencode": get_opencode(state, now),
     }
     # Print before saving: the widget's data must never depend on the cache write.
     print(json.dumps(out), flush=True)
