@@ -271,6 +271,10 @@ def _read_key(fd: int) -> str:
         return "up"
     if ch in (b"j",):
         return "down"
+    if ch in (b"a", b"A"):
+        return "all"
+    if ch.isdigit():
+        return f"digit:{ch.decode()}"
     return ""
 
 
@@ -362,8 +366,9 @@ def _render_checklist(
         text.append("\n")
     if end < len(nodes):
         text.append(f"   ↓ {len(nodes) - end} more\n", style="dim")
+    count = len(effective_selection(nodes))
     text.append(
-        "\n↑/↓ move · space toggle · enter confirm · q cancel",
+        f"\n{count} selected · ↑/↓ move · space toggle · a all · enter confirm · q cancel",
         style="dim",
     )
     return text
@@ -393,6 +398,10 @@ def interactive_select(
             state["cursor"] = (state["cursor"] + 1) % len(nodes)
         elif key == "space":
             _toggle(nodes, state["cursor"])
+        elif key == "all":
+            val = any(not n.checked for n in nodes)
+            for n in nodes:
+                n.checked = val
         elif key == "enter":
             return "confirm"
         elif key == "quit":
@@ -422,9 +431,9 @@ def menu_select(
                 text.append("\n")
             pointer = ">" if i == state["cursor"] else " "
             style = "reverse" if i == state["cursor"] else ""
-            text.append(f"{pointer} {label}\n", style=style)
+            text.append(f"{pointer} {i + 1}. {label}\n", style=style)
         text.append(
-            "\n↑/↓ move · enter select · q quit", style="dim"
+            f"\n↑/↓ move · 1-{len(options)} jump · enter select · q quit", style="dim"
         )
         return text
 
@@ -433,6 +442,11 @@ def menu_select(
             state["cursor"] = (state["cursor"] - 1) % len(options)
         elif key == "down":
             state["cursor"] = (state["cursor"] + 1) % len(options)
+        elif key.startswith("digit:"):
+            idx = int(key[6:]) - 1
+            if 0 <= idx < len(options):
+                state["cursor"] = idx
+                return "confirm"
         elif key == "enter":
             return "confirm"
         elif key == "quit":
@@ -488,6 +502,15 @@ def apply_key(key: str, ts: str) -> None:
     console.print(f"  applied [cyan]{key}[/cyan]")
 
 
+def _git(*args: str) -> bool:
+    """Run a git command in the repo; on failure print a one-liner instead of
+    raising (git's own stderr is already visible)."""
+    if subprocess.run(["git", *args], cwd=REPO_ROOT).returncode != 0:
+        console.print(f"[red]git {args[0]} failed — resolve and retry.[/red]")
+        return False
+    return True
+
+
 # --- commands ---------------------------------------------------------------
 
 
@@ -513,7 +536,8 @@ def cmd_sync(_: argparse.Namespace) -> None:
         return
     save_cache("sync", keys)
 
-    subprocess.run(["git", "pull", "--rebase"], cwd=REPO_ROOT, check=True)
+    if not _git("pull", "--rebase"):
+        return
 
     PROFILES_DIR.mkdir(parents=True, exist_ok=True)
     for key in keys:
@@ -525,7 +549,8 @@ def cmd_sync(_: argparse.Namespace) -> None:
         console.print(f"  copied [cyan]{key}[/cyan]")
 
     rel = PROFILES_DIR.relative_to(REPO_ROOT)
-    subprocess.run(["git", "add", "-f", "--", str(rel)], cwd=REPO_ROOT, check=True)
+    if not _git("add", "-f", "--", str(rel)):
+        return
     staged = subprocess.run(["git", "diff", "--cached", "--quiet"], cwd=REPO_ROOT)
     if staged.returncode == 0:
         console.print("[yellow]No changes to commit.[/yellow]")
@@ -533,8 +558,8 @@ def cmd_sync(_: argparse.Namespace) -> None:
 
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     msg = f"Sync from {hostname} at {now} by {getuser()}"
-    subprocess.run(["git", "commit", "-m", msg], cwd=REPO_ROOT, check=True)
-    subprocess.run(["git", "push"], cwd=REPO_ROOT, check=True)
+    if not _git("commit", "-m", msg) or not _git("push"):
+        return
     console.print(f"[green]Synced:[/green] {msg}")
 
 
@@ -558,11 +583,13 @@ def cmd_block(_: argparse.Namespace) -> None:
         return
     selected = blocked_names(result)
 
-    subprocess.run(["git", "pull", "--rebase"], cwd=REPO_ROOT, check=True)
+    if not _git("pull", "--rebase"):
+        return
     save_ignore(selected, nodes, ignore)
 
     rel = (DATA_DIR / "ignore.toml").relative_to(REPO_ROOT)
-    subprocess.run(["git", "add", "--", str(rel)], cwd=REPO_ROOT, check=True)
+    if not _git("add", "--", str(rel)):
+        return
     staged = subprocess.run(["git", "diff", "--cached", "--quiet"], cwd=REPO_ROOT)
     if staged.returncode == 0:
         console.print("[yellow]No changes to the block list.[/yellow]")
@@ -570,8 +597,8 @@ def cmd_block(_: argparse.Namespace) -> None:
 
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     msg = f"Update block list from {hostname} at {now} by {getuser()}"
-    subprocess.run(["git", "commit", "-m", msg], cwd=REPO_ROOT, check=True)
-    subprocess.run(["git", "push"], cwd=REPO_ROOT, check=True)
+    if not _git("commit", "-m", msg) or not _git("push"):
+        return
     console.print("[green]Block list updated.[/green]")
 
 
@@ -601,7 +628,8 @@ def cmd_apply(args: argparse.Namespace) -> None:
 
     if nodes:
         preselect(nodes, "apply")
-        result = interactive_select(nodes, "Apply dotfiles")
+        info = last_sync_info([n.key for n in nodes])
+        result = interactive_select(nodes, "Apply dotfiles", info=info)
         if result is None:
             if not (sys.stdin.isatty() and sys.stdout.isatty()):
                 console.print("[red]Apply requires an interactive terminal.[/red]")
@@ -681,21 +709,23 @@ def cmd_clean_profile(_: argparse.Namespace) -> None:
         console.print("[yellow]Cancelled.[/yellow]")
         return
 
-    subprocess.run(["git", "pull", "--rebase"], cwd=REPO_ROOT, check=True)
+    if not _git("pull", "--rebase"):
+        return
     for key in keys:
         _remove(PROFILES_DIR / key)
         console.print(f"  removed [cyan]{key}[/cyan]")
 
     rel = PROFILES_DIR.relative_to(REPO_ROOT)
-    subprocess.run(["git", "add", "-f", "--", str(rel)], cwd=REPO_ROOT, check=True)
+    if not _git("add", "-f", "--", str(rel)):
+        return
     staged = subprocess.run(["git", "diff", "--cached", "--quiet"], cwd=REPO_ROOT)
     if staged.returncode == 0:
         console.print("[yellow]No changes to commit.[/yellow]")
         return
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     msg = f"Clean profile from {hostname} at {now} by {getuser()}: {', '.join(keys)}"
-    subprocess.run(["git", "commit", "-m", msg], cwd=REPO_ROOT, check=True)
-    subprocess.run(["git", "push"], cwd=REPO_ROOT, check=True)
+    if not _git("commit", "-m", msg) or not _git("push"):
+        return
     console.print(f"[green]Cleaned:[/green] {msg}")
 
 
@@ -711,17 +741,21 @@ def run_menu(args: argparse.Namespace) -> None:
         ("block", "Edit block list"),
         ("quit", "Quit"),
     ]
-    choice = menu_select("dotfiles TUI", options)
-    if choice == "sync":
-        cmd_sync(args)
-    elif choice == "apply":
-        cmd_apply(args)
-    elif choice == "clean-profile":
-        cmd_clean_profile(args)
-    elif choice == "clean":
-        cmd_clean_backups(args)
-    elif choice == "block":
-        cmd_block(args)
+    while True:
+        choice = menu_select("dotfiles TUI", options)
+        if choice in (None, "quit"):
+            return
+        if choice == "sync":
+            cmd_sync(args)
+        elif choice == "apply":
+            cmd_apply(args)
+        elif choice == "clean-profile":
+            cmd_clean_profile(args)
+        elif choice == "clean":
+            cmd_clean_backups(args)
+        elif choice == "block":
+            cmd_block(args)
+        console.print()
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
