@@ -8,6 +8,10 @@ never blanks the widget. Never prints tokens or credentials.
 
 Windows: day = since local midnight; week/month = last 7/30 calendar days
 (Cursor uses exact ms ranges — close enough for a glance widget).
+
+`--fresh` bypasses the API_TTL cache for this run (new timestamps still saved).
+Vendor APIs are only called while the provider's app is running; otherwise the
+provider reports status "idle" with last-known cached data.
 """
 import glob
 import json
@@ -61,6 +65,35 @@ def save_state(state):
         os.replace(tmp, STATE_PATH)
     except OSError:
         pass
+
+
+def proc_running(match):
+    """True if any process's comm/cmdline satisfies match(comm, cmdline)."""
+    for pid in os.listdir("/proc"):
+        if not pid.isdigit():
+            continue
+        try:
+            with open("/proc/%s/comm" % pid) as f:
+                comm = f.read().strip()
+            with open("/proc/%s/cmdline" % pid, "rb") as f:
+                cmdline = f.read()
+        except OSError:
+            continue  # process exited mid-scan
+        if match(comm, cmdline):
+            return True
+    return False
+
+
+def claude_running():
+    # Interactive sessions have comm "claude"; exclude the persistent
+    # `claude daemon run` background process.
+    return proc_running(lambda c, cl: c == "claude" and b"daemon" not in cl)
+
+
+def cursor_running():
+    # comm is truncated at 15 chars; covers cursor / Cursor / cursor-agent /
+    # AppImage electron.
+    return proc_running(lambda c, cl: c.lower().startswith("cursor"))
 
 
 def http_json(url, headers, body=None):
@@ -187,11 +220,13 @@ def claude_scan(state):
     return usage, sorted(unpriced)
 
 
-def claude_limits(state, now):
+def claude_limits(state, now, fresh, running):
     """Session/weekly utilization from Anthropic's OAuth usage endpoint,
     throttled to API_TTL. Returns (limits|None, status, error)."""
     cached = state.get("claude_limits", {})
-    if now - cached.get("fetched_at", 0) < API_TTL:
+    if not running:
+        return cached.get("data"), "idle", None
+    if not fresh and now - cached.get("fetched_at", 0) < API_TTL:
         return cached.get("data"), "ok", None
 
     def stale(err):
@@ -234,7 +269,7 @@ def claude_limits(state, now):
     return data, "ok", None
 
 
-def get_claude(state, now):
+def get_claude(state, now, fresh, running):
     out = {"status": "ok", "error": None, "limits": None,
            "usage": {w: dict(EMPTY_WINDOW) for w in ("day", "week", "month")},
            "unpriced_models": []}
@@ -242,7 +277,7 @@ def get_claude(state, now):
         out["usage"], out["unpriced_models"] = claude_scan(state)
     except Exception as e:
         return {**out, "status": "error", "error": "transcript scan failed: " + type(e).__name__}
-    out["limits"], out["status"], out["error"] = claude_limits(state, now)
+    out["limits"], out["status"], out["error"] = claude_limits(state, now, fresh, running)
     return out
 
 
@@ -297,9 +332,14 @@ def cursor_fetch(now):
     return {"limits": limits, "usage": usage}
 
 
-def get_cursor(state, now):
+def get_cursor(state, now, fresh, running):
     cached = state.get("cursor", {})
-    if now - cached.get("fetched_at", 0) < API_TTL:
+    if not running:
+        if cached.get("data"):
+            return {"status": "idle", "error": None, **cached["data"]}
+        return {"status": "idle", "error": None, "limits": None,
+                "usage": {w: dict(EMPTY_WINDOW) for w in ("day", "week", "month")}}
+    if not fresh and now - cached.get("fetched_at", 0) < API_TTL:
         return {"status": "ok", "error": None, **cached["data"]}
     try:
         data = cursor_fetch(now)
@@ -418,12 +458,14 @@ def main():
     if mock:
         sys.stdout.write(open(mock).read())
         return
+    fresh = "--fresh" in sys.argv[1:]
     now = time.time()
     state = load_state()
     out = {
         "generated_at": int(now),
-        "claude": get_claude(state, now),
-        "cursor": get_cursor(state, now),
+        "claude": get_claude(state, now, fresh, claude_running()),
+        "cursor": get_cursor(state, now, fresh, cursor_running()),
+        # OpenCode is entirely local (sqlite): no API to gate or refresh.
         "opencode": get_opencode(state, now),
     }
     # Print before saving: the widget's data must never depend on the cache write.

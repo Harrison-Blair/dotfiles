@@ -7,9 +7,9 @@ import qs.components
 // AI usage at a glance (Claude Code / OpenCode / Cursor). The shared
 // services/AiUsage.qml singleton runs scripts/ai-usage.py every 60s (API
 // calls throttled to 5min inside the script) and feeds all bar instances.
-// Bar shows one segment per provider: session% / weekly% / monthly% +
-// 30-day cost, in the provider's base color; hover popup has limits/resets
-// and day/week/month cost + token breakdowns.
+// Bar shows one segment per provider: icon in the provider's color, then
+// session% / weekly% / monthly% + 30-day cost in the default fg; hover
+// popup has limits/resets and day/week/month cost + token breakdowns.
 Item {
     id: root
     implicitWidth: row.implicitWidth
@@ -122,7 +122,7 @@ Item {
         Text {
             textFormat: Text.RichText
             text: root.segText(root.stats ? root.stats.claude : null, false)
-            color: Theme.aiClaude
+            color: Theme.fg
             font.family: Theme.fontFamily
             font.pixelSize: Theme.fontSize
         }
@@ -164,6 +164,7 @@ Item {
             model: root.stats ? [
                 {
                     title: "Claude Code",
+                    icon: Theme.icoAi,
                     tag: (root.stats.claude.limits && root.stats.claude.limits.plan) || "",
                     color: Theme.aiClaude,
                     p: root.stats.claude,
@@ -171,6 +172,7 @@ Item {
                 },
                 {
                     title: "OpenCode",
+                    icon: Theme.icoOpencode,
                     tag: "opencode-go",
                     color: Theme.fg,
                     p: root.stats.opencode,
@@ -178,6 +180,7 @@ Item {
                 },
                 {
                     title: "Cursor",
+                    icon: Theme.icoCursor,
                     tag: (root.stats.cursor.limits && root.stats.cursor.limits.membership) || "",
                     color: Theme.aiCursor,
                     p: root.stats.cursor,
@@ -199,20 +202,35 @@ Item {
                     implicitHeight: 1
                     color: Theme.sep
                 }
-                Text {
-                    textFormat: Text.RichText
-                    text: section.modelData.title
-                        + (section.modelData.tag
-                           ? ' <span style="color:' + Theme.sep + '">· ' + section.modelData.tag + "</span>" : "")
-                    color: section.modelData.color
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.fontSize
-                    font.bold: true
+                RowLayout {
+                    spacing: 6
+                    Icon {
+                        text: section.modelData.icon
+                        color: section.modelData.color
+                        size: Theme.iconSizeSmall
+                    }
+                    Text {
+                        textFormat: Text.RichText
+                        text: section.modelData.title
+                            + (section.modelData.tag
+                               ? ' <span style="color:' + Theme.sep + '">· ' + section.modelData.tag + "</span>" : "")
+                        color: section.modelData.color
+                        font.family: Theme.fontFamily
+                        font.pixelSize: Theme.fontSize
+                        font.bold: true
+                    }
                 }
                 Text {
                     visible: section.modelData.p.error !== null
                     text: "⚠ " + section.modelData.p.error
                     color: Theme.warn
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.fontSize - 2
+                }
+                Text {
+                    visible: section.modelData.p.status === "idle"
+                    text: "idle — app not running, showing cached limits"
+                    color: Theme.sep
                     font.family: Theme.fontFamily
                     font.pixelSize: Theme.fontSize - 2
                 }
@@ -238,6 +256,10 @@ Item {
             color: Theme.fg
             font.family: Theme.fontFamily
             font.pixelSize: Theme.fontSize
+        }
+        MenuButton {
+            label: "Refresh now"
+            onTriggered: Services.AiUsage.refresh()
         }
     }
 }

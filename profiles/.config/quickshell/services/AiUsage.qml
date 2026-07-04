@@ -9,12 +9,24 @@ Singleton {
     id: root
 
     property var stats: null
+    // Next run bypasses the script's API cache: set at startup and by refresh().
+    property bool freshNext: true
+
+    function refresh() {
+        root.freshNext = true
+        if (!proc.running) proc.running = true
+    }
 
     Process {
         id: proc
-        command: ["python3", Quickshell.env("HOME") + "/.config/quickshell/scripts/ai-usage.py"]
+        command: {
+            const cmd = ["python3", Quickshell.env("HOME") + "/.config/quickshell/scripts/ai-usage.py"]
+            if (root.freshNext) cmd.push("--fresh")
+            return cmd
+        }
         stdout: StdioCollector {
             onStreamFinished: {
+                root.freshNext = false
                 try { root.stats = JSON.parse(this.text) } catch (e) {}
             }
         }

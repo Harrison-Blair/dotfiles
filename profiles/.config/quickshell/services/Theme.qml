@@ -71,6 +71,7 @@ Singleton {
     readonly property string icoCpu: String.fromCodePoint(0xF4BC)
     readonly property string icoAi: String.fromCodePoint(0xF09D1)        // md brain
     readonly property string icoOpencode: String.fromCodePoint(0xF018D)  // md console
+    readonly property string icoCursor: String.fromCodePoint(0xF0152)    // md cursor-default
     readonly property string icoScreenshot: String.fromCodePoint(0xF0100)  // md camera
     readonly property string icoNotification: String.fromCodePoint(0xF009A)  // md bell
     readonly property string icoScratchpad: String.fromCodePoint(0xF0068)  // md auto-fix (magic wand)

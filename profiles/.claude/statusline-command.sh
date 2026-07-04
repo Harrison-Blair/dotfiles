@@ -108,23 +108,18 @@ if [ -n "$total_ctx_tokens" ] && [ -n "$cw_size" ]; then
   parts+=("$ctx_str")
 fi
 
-# Format a countdown from now until an absolute unix-epoch reset time. Style
-# "hm" renders H:M (hours accumulate past 24); style "dhm" renders d:h:m. Minutes
-# (and hours in dhm) are zero-padded. A past/zero delta renders as all zeros.
-now=$(date +%s)
+# Format an absolute unix-epoch reset time in 24-hour clock. Style "time"
+# renders "19:00"; style "date" prefixes the date, e.g. "Jul 9 19:00".
 fmt_reset() {
-  awk -v target="$1" -v now="$now" -v style="$2" 'BEGIN {
-    d = target - now
-    if (d < 0) d = 0
-    if (style == "dhm")
-      printf "%d:%02d:%02d", int(d / 86400), int((d % 86400) / 3600), int((d % 3600) / 60)
-    else
-      printf "%d:%02d", int(d / 3600), int((d % 3600) / 60)
-  }'
+  if [ "$2" = "date" ]; then
+    date -d "@$1" '+%b %-d %H:%M'
+  else
+    date -d "@$1" '+%H:%M'
+  fi
 }
 
 # Rate limit segments: used-percentage colored by usage thresholds, followed by
-# a "[H:M]" countdown to the window reset when a reset time is present.
+# the reset time ("[7pm]" for 5h, "[Jul 9]" for weekly) when present.
 rate_part() {
   local label="$1" pct="$2" reset="$3" style="$4"
   [ -z "$pct" ] && return
@@ -144,8 +139,8 @@ rate_part() {
   printf '%s' "$seg"
 }
 
-p=$(rate_part "5h" "$five_pct" "$five_reset" "hm");   [ -n "$p" ] && parts+=("$p")
-p=$(rate_part "w" "$week_pct" "$week_reset" "dhm");   [ -n "$p" ] && parts+=("$p")
+p=$(rate_part "5h" "$five_pct" "$five_reset" "time"); [ -n "$p" ] && parts+=("$p")
+p=$(rate_part "w" "$week_pct" "$week_reset" "date");  [ -n "$p" ] && parts+=("$p")
 
 out=""
 for i in "${!parts[@]}"; do

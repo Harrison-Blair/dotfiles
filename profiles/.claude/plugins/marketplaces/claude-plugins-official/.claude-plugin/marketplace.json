@@ -6,6 +6,12 @@
     "name": "Anthropic",
     "email": "support@anthropic.com"
   },
+  "renames": {
+    "adlc": "agentforce-adlc",
+    "airwallex": "airwallex-agentos",
+    "convex-backend": "convex",
+    "vals": "valtown"
+  },
   "plugins": [
     {
       "name": "42crunch-api-security-testing",
@@ -19,7 +25,7 @@
         "url": "https://github.com/42Crunch-AI/claude-plugins.git",
         "path": "plugins/api-security-testing",
         "ref": "v1.5.5",
-        "sha": "a1539ca3dcc56a9dd396e76a636d56c81cf6cafd"
+        "sha": "2ed4978117324165d07f43681f9a908fddefea47"
       },
       "homepage": "https://42crunch.com"
     },
@@ -599,7 +605,7 @@
         "url": "https://github.com/carta/plugins.git",
         "path": "plugins/carta-investors",
         "ref": "main",
-        "sha": "515c08928d76d3b1b515a63a82bf7272dff1578f"
+        "sha": "e32d1707c89887768fd8462c3942865ae3b7e343"
       },
       "homepage": "https://carta.com"
     },
@@ -920,7 +926,7 @@
       "source": {
         "source": "url",
         "url": "https://github.com/get-convex/convex-backend-skill.git",
-        "sha": "f40fdfe436e90a81b0cccacad320cfeff10ff2d5"
+        "sha": "25815e82e848720f11c57fdaf161ecd846e0e7dd"
       },
       "homepage": "https://github.com/get-convex/convex-backend-skill",
       "keywords": [
@@ -1277,7 +1283,7 @@
       "source": {
         "source": "url",
         "url": "https://github.com/fastly/fastly-agent-toolkit.git",
-        "sha": "6351c84a5747eeb56111181a6babae6d78880092"
+        "sha": "ea3623d5facc7053eaa802f5fc483dd7121a39aa"
       },
       "homepage": "https://github.com/fastly/fastly-agent-toolkit/blob/main/README.md"
     },
@@ -1550,7 +1556,7 @@
       "source": {
         "source": "url",
         "url": "https://github.com/heygen-com/hyperframes.git",
-        "sha": "dd774b3692e71656b038cb2d5a11f05ba52c2880"
+        "sha": "e92700acded50469d3fb35da3a8b198d2cdc36d8"
       },
       "homepage": "https://hyperframes.heygen.com"
     },
@@ -2939,7 +2945,7 @@
       "source": {
         "source": "url",
         "url": "https://github.com/slackapi/slack-mcp-plugin.git",
-        "sha": "39066985fc32cede7d953a679f931003368a2cdc"
+        "sha": "6af155a7082b881ba9f80bc86b449b2b7f688393"
       },
       "homepage": "https://github.com/slackapi/slack-mcp-plugin/tree/main"
     },
