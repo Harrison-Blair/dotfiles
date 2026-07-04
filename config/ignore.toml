@@ -21,6 +21,7 @@ ignore = [
   ".vim",
   ".vscode-oss-shared",
   "1Password",
+  "VSCodium",
   "BraveSoftware",
   "chromium",
   "dconf",
