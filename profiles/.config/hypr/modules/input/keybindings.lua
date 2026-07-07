@@ -19,6 +19,7 @@ hl.bind(mainMod .. " + F", hl.dsp.exec_cmd(webBrowser))
 hl.bind(mainMod .. " + V", hl.dsp.exec_cmd(string.format("clipvault list | %s -dmenu -display-columns 2 | clipvault get | wl-copy", menu)))
 hl.bind(mainMod .. " + D", hl.dsp.exec_cmd(string.format("%s -show run", menu)))
 hl.bind(mainMod .. " + P", hl.dsp.window.pseudo())
+hl.bind(mainMod .. " + L", hl.dsp.exec_cmd("qs ipc call lock lock"))
 hl.bind(mainMod .. " + J", hl.dsp.layout("togglesplit"))    -- dwindle only
 
 -- Cycle per-workspace gaps: 5/10 -> 30/60 -> 45/90 (SHIFT: inner only, CTRL: outer only)

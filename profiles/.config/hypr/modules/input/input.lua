@@ -15,7 +15,9 @@ hl.config({
         sensitivity = 0, -- -1.0 - 1.0, 0 means no modification.
 
         touchpad = {
-            natural_scroll = true,
+            natural_scroll       = true,
+            tap_to_click         = true,
+            disable_while_typing = true,
         },
     },
 })
