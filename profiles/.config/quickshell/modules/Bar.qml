@@ -35,6 +35,8 @@ PanelWindow {
         Separator { visible: !bar.portrait }
         Cpu { visible: !bar.portrait }
         Separator { visible: !bar.portrait }
+        Gpu { visible: !bar.portrait }
+        Separator { visible: !bar.portrait }
         Temperature { visible: !bar.portrait }
         Separator { visible: battery.present && !bar.portrait }
         Battery { id: battery; visible: present && !bar.portrait }

@@ -1,6 +1,10 @@
 <!-- This file is loaded for every Claude Code session, regardless of working directory. -->
 <!-- Add personal preferences, defaults, or guidance that should apply everywhere. -->
-# Commits
+# User Preferences
+- Split tasks by domain and offer to split implimentation into subagents when able and scope benifits from
+- Use task tracking when available, ensure proper task hygine
+- Ask the user clarifying questions at each diverging decision tree
+
 NEVER add yourself as a co-author (no `Co-Authored-By` trailer) on commits I ask you to make.
 
 # Core Tennants
@@ -64,3 +68,11 @@ For multi-step tasks, state a brief plan:
 3. [Step] → verify: [check]
 
 Strong success criteria let you loop independently. Weak criteria ("make it work") require constant clarification.
+
+# Test Verification
+
+A test only counts if it fails when the behavior breaks.
+
+- New test for a bug fix: run it against the unfixed code (or revert the fix) and confirm it FAILS, then confirm it passes with the fix.
+- New test for a feature: temporarily break or stub out the feature and confirm the test fails, then restore.
+- Never trust a test that has only ever been seen passing.

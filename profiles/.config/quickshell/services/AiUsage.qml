@@ -32,7 +32,10 @@ Singleton {
         }
     }
     Timer {
-        interval: 60000
+        // Poll every 5s while an AI coding app (Claude Code / Cursor / OpenCode)
+        // is running, else every 60s. `active` comes from the last script run,
+        // so an idle→active switch takes up to 60s to speed up.
+        interval: (root.stats && root.stats.active) ? 5000 : 60000
         running: true
         repeat: true
         triggeredOnStart: true

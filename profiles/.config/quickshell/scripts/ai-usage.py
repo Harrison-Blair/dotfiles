@@ -41,6 +41,26 @@ CLAUDE_PRICES = {
 
 EMPTY_WINDOW = {"cost": 0.0, "input": 0, "output": 0, "cache_read": 0, "cache_write": 0}
 
+
+def new_model_windows(all_time):
+    """Per-model accumulator: cost + input/output tokens per window. Claude gets
+    an extra all-time cost bucket (its transcript history is never pruned)."""
+    cost = {"day": 0.0, "week": 0.0, "month": 0.0}
+    if all_time:
+        cost["all"] = 0.0
+    return {"cost": cost, "in": {"day": 0, "week": 0, "month": 0},
+            "out": {"day": 0, "week": 0, "month": 0}}
+
+
+def model_entry(name, mw):
+    """Round a per-model accumulator into the emitted JSON shape."""
+    return {
+        "name": name,
+        "cost": {w: round(c, 2) for w, c in mw["cost"].items()},
+        "in": dict(mw["in"]),
+        "out": dict(mw["out"]),
+    }
+
 # OpenCode Go plan: $ limits per rolling window (opencode.ai/docs/go/).
 OPENCODE_GO_LIMITS = (12.0, 30.0, 60.0)
 OPENCODE_GO_WINDOWS_H = (5, 7 * 24, 30 * 24)
@@ -94,6 +114,15 @@ def cursor_running():
     # comm is truncated at 15 chars; covers cursor / Cursor / cursor-agent /
     # AppImage electron.
     return proc_running(lambda c, cl: c.lower().startswith("cursor"))
+
+
+def opencode_running():
+    # comm "opencode"; the TUI and its server share the name.
+    return proc_running(lambda c, cl: c == "opencode")
+
+
+def pi_running():
+    return proc_running(lambda c, cl: c == "pi")
 
 
 def http_json(url, headers, body=None):
@@ -198,26 +227,40 @@ def claude_scan(state):
     windows = {"day": local_dates(1), "week": local_dates(7), "month": local_dates(30)}
     usage = {w: dict(EMPTY_WINDOW) for w in windows}
     unpriced = set()
+    # Per-model cost (+ all-time) and input/output tokens per window; buckets
+    # are never age-pruned, so all-time cost is exact.
+    model_windows = {}
     for entry in files_state.values():
         for date, models in entry["buckets"].items():
-            for w, dates in windows.items():
-                if date not in dates:
-                    continue
-                for model, (ti, to, cw, cr) in models.items():
+            in_windows = [w for w, dates in windows.items() if date in dates]
+            for model, (ti, to, cw, cr) in models.items():
+                price = claude_price(model)
+                if price:
+                    cost = (ti * price[0] + to * price[1]
+                            + cw * price[2] + cr * price[3]) / 1e6
+                else:
+                    cost = 0.0
+                    unpriced.add(model)
+                mw = model_windows.setdefault(model, new_model_windows(all_time=True))
+                mw["cost"]["all"] += cost
+                for w in in_windows:
                     agg = usage[w]
                     agg["input"] += ti
                     agg["output"] += to
                     agg["cache_write"] += cw
                     agg["cache_read"] += cr
-                    price = claude_price(model)
-                    if price:
-                        agg["cost"] += (ti * price[0] + to * price[1]
-                                        + cw * price[2] + cr * price[3]) / 1e6
-                    else:
-                        unpriced.add(model)
+                    agg["cost"] += cost
+                    mw["cost"][w] += cost
+                    mw["in"][w] += ti
+                    mw["out"][w] += to
     for agg in usage.values():
         agg["cost"] = round(agg["cost"], 2)
-    return usage, sorted(unpriced)
+    models_out = [
+        model_entry(m, v) for m, v in model_windows.items()
+        if round(v["cost"]["all"], 2) > 0
+    ]
+    models_out.sort(key=lambda m: m["cost"]["all"], reverse=True)
+    return usage, models_out, sorted(unpriced)
 
 
 def claude_limits(state, now, fresh, running):
@@ -272,9 +315,9 @@ def claude_limits(state, now, fresh, running):
 def get_claude(state, now, fresh, running):
     out = {"status": "ok", "error": None, "limits": None,
            "usage": {w: dict(EMPTY_WINDOW) for w in ("day", "week", "month")},
-           "unpriced_models": []}
+           "models": [], "unpriced_models": []}
     try:
-        out["usage"], out["unpriced_models"] = claude_scan(state)
+        out["usage"], out["models"], out["unpriced_models"] = claude_scan(state)
     except Exception as e:
         return {**out, "status": "error", "error": "transcript scan failed: " + type(e).__name__}
     out["limits"], out["status"], out["error"] = claude_limits(state, now, fresh, running)
@@ -360,8 +403,86 @@ def get_cursor(state, now, fresh, running):
 
 # --- OpenCode ----------------------------------------------------------------
 
+def pi_scan(state, now_ms):
+    """Incrementally aggregate pi agent transcripts (~/.pi/agent/sessions).
+
+    pi spends against the same opencode/opencode-go account but logs its own
+    JSONL sessions instead of writing to the opencode db. Per-file cache:
+    {mtime, size, msgs: {uid: record}} where record matches the db scanner's
+    8-field shape so get_opencode() can aggregate both. Dedupe on message
+    id + responseId across files (resumed sessions duplicate entries).
+    """
+    files_state = state.setdefault("pi_files", {})
+    paths = glob.glob(os.path.join(HOME, ".pi", "agent", "sessions", "**", "*.jsonl"),
+                      recursive=True)
+    path_set = set(paths)
+    for p in list(files_state):
+        if p not in path_set:
+            del files_state[p]
+
+    changed = []
+    for p in paths:
+        try:
+            st = os.stat(p)
+        except OSError:
+            continue
+        entry = files_state.get(p)
+        if not entry or entry["mtime"] != st.st_mtime or entry["size"] != st.st_size:
+            changed.append((st.st_mtime, st.st_size, p))
+
+    changed_paths = {p for _, _, p in changed}
+    seen_ids = set()
+    for p, entry in files_state.items():
+        if p not in changed_paths:
+            seen_ids.update(entry["msgs"])
+
+    month_ago_ms = now_ms - 30 * 86400_000
+    for mtime, size, p in sorted(changed):
+        msgs = {}
+        try:
+            with open(p, errors="replace") as f:
+                for line in f:
+                    try:
+                        obj = json.loads(line)
+                    except ValueError:
+                        continue
+                    if obj.get("type") != "message":
+                        continue
+                    msg = obj.get("message") or {}
+                    usage = msg.get("usage")
+                    created = msg.get("timestamp")
+                    if (msg.get("role") != "assistant" or not usage or not created
+                            or created < month_ago_ms
+                            or msg.get("provider") not in ("opencode", "opencode-go")):
+                        continue
+                    uid = (obj.get("id") or "") + ":" + (msg.get("responseId") or "")
+                    if uid != ":":
+                        if uid in seen_ids:
+                            continue
+                        seen_ids.add(uid)
+                    msgs[uid] = [
+                        created,
+                        (usage.get("cost") or {}).get("total") or 0,
+                        usage.get("input") or 0,
+                        (usage.get("output") or 0) + (usage.get("reasoning") or 0),
+                        usage.get("cacheRead") or 0,
+                        usage.get("cacheWrite") or 0,
+                        1 if msg.get("provider") == "opencode-go" else 0,
+                        msg.get("model") or "?",
+                    ]
+        except OSError:
+            continue
+        files_state[p] = {"mtime": mtime, "size": size, "msgs": msgs}
+
+    records = []
+    for entry in files_state.values():
+        entry["msgs"] = {u: m for u, m in entry["msgs"].items() if m[0] >= month_ago_ms}
+        records.extend(entry["msgs"].values())
+    return records
+
+
 def get_opencode(state, now):
-    """Incremental scan of the opencode db.
+    """Incremental scan of the opencode db, merged with pi_scan() records.
 
     All widget windows are <=30 days, so the cache only keeps a compact
     per-message record for the last 30 days: {id: [created_ms, cost, input,
@@ -373,6 +494,10 @@ def get_opencode(state, now):
     usage = {w: dict(EMPTY_WINDOW) for w in ("day", "week", "month")}
     db = os.path.join(HOME, ".local", "share", "opencode", "opencode.db")
     oc = state.setdefault("opencode_scan", {"cursor": 0, "msgs": {}})
+    # Migration: caches predating the per-model breakdown stored 7-field records
+    # with no model id. Reset once so a full 30-day re-read repopulates names.
+    if any(len(m) < 8 for m in oc["msgs"].values()):
+        oc = state["opencode_scan"] = {"cursor": 0, "msgs": {}}
     now_ms = now * 1000
     month_ago_ms = now_ms - 30 * 86400_000
     try:
@@ -408,8 +533,10 @@ def get_opencode(state, now):
             cache.get("read") or 0,
             cache.get("write") or 0,
             1 if msg.get("providerID") == "opencode-go" else 0,
+            msg.get("modelID") or "?",
         ]
     oc["msgs"] = {mid: m for mid, m in oc["msgs"].items() if m[0] >= month_ago_ms}
+    pi_records = pi_scan(state, now_ms)
 
     windows = {"day": local_dates(1), "week": local_dates(7), "month": local_dates(30)}
     # Rolling opencode-go spend for the Go plan limit windows (5h/7d/30d).
@@ -417,7 +544,11 @@ def get_opencode(state, now):
     # Oldest in-window request per window; the window begins to free up at
     # oldest + window duration (a local "resets at" approximation).
     go_oldest = [None, None, None]
-    for created, cost, tin, tout, cread, cwrite, is_go in oc["msgs"].values():
+    # Per-model cost + tokens across windows (no all-time: msgs pruned to 30d).
+    model_windows = {}
+    for rec in list(oc["msgs"].values()) + pi_records:
+        created, cost, tin, tout, cread, cwrite, is_go = rec[:7]
+        model = rec[7] if len(rec) > 7 else "?"
         if is_go:
             for i, hours in enumerate(OPENCODE_GO_WINDOWS_H):
                 if created >= now_ms - hours * 3600_000:
@@ -434,8 +565,17 @@ def get_opencode(state, now):
             agg["output"] += tout
             agg["cache_read"] += cread
             agg["cache_write"] += cwrite
+            mw = model_windows.setdefault(model, new_model_windows(all_time=False))
+            mw["cost"][w] += cost
+            mw["in"][w] += tin
+            mw["out"][w] += tout
     for agg in usage.values():
         agg["cost"] = round(agg["cost"], 2)
+    models_out = [
+        model_entry(m, v) for m, v in model_windows.items()
+        if round(v["cost"]["month"], 2) > 0
+    ]
+    models_out.sort(key=lambda m: m["cost"]["month"], reverse=True)
     # Local approximation of the Go plan limits: only counts this machine's usage.
     limits = {
         "session_pct": round(go_spend[0] / OPENCODE_GO_LIMITS[0] * 100),
@@ -448,7 +588,8 @@ def get_opencode(state, now):
         "week_resets_at": window_resets_at(go_oldest[1], OPENCODE_GO_WINDOWS_H[1]),
         "month_resets_at": window_resets_at(go_oldest[2], OPENCODE_GO_WINDOWS_H[2]),
     }
-    return {"status": "ok", "error": None, "usage": usage, "limits": limits}
+    return {"status": "ok", "error": None, "usage": usage, "limits": limits,
+            "models": models_out}
 
 
 # --- main --------------------------------------------------------------------
@@ -461,10 +602,17 @@ def main():
     fresh = "--fresh" in sys.argv[1:]
     now = time.time()
     state = load_state()
+    claude_up = claude_running()
+    cursor_up = cursor_running()
+    opencode_up = opencode_running()
+    pi_up = pi_running()
     out = {
         "generated_at": int(now),
-        "claude": get_claude(state, now, fresh, claude_running()),
-        "cursor": get_cursor(state, now, fresh, cursor_running()),
+        # True while any AI coding app has a live process; the widget polls
+        # fast (5s) when active, slowly when idle.
+        "active": claude_up or cursor_up or opencode_up or pi_up,
+        "claude": get_claude(state, now, fresh, claude_up),
+        "cursor": get_cursor(state, now, fresh, cursor_up),
         # OpenCode is entirely local (sqlite): no API to gate or refresh.
         "opencode": get_opencode(state, now),
     }

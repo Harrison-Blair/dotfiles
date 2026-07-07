@@ -17,8 +17,14 @@ Item {
     readonly property bool muted: ready ? sink.audio.muted : false
     readonly property int volume: ready ? Math.round(sink.audio.volume * 100) : 0
 
-    // Required for sink.audio.{volume,muted} to stay live.
-    PwObjectTracker { objects: [Pipewire.defaultAudioSink] }
+    readonly property var source: Pipewire.defaultAudioSource
+    readonly property bool srcReady: source && source.audio
+    readonly property bool srcMuted: srcReady ? source.audio.muted : false
+    readonly property int srcVolume: srcReady ? Math.round(source.audio.volume * 100) : 0
+
+    // Required for {sink,source}.audio.{volume,muted} to stay live. Binds to the
+    // Pipewire.default* properties, so it re-targets when the default device changes.
+    PwObjectTracker { objects: [Pipewire.defaultAudioSink, Pipewire.defaultAudioSource] }
 
     // Reserve width for the widest label ("100%"/"Mute") so the widget — and
     // thus the whole centered bar — doesn't shift as the volume changes.
@@ -27,6 +33,15 @@ Item {
         font.family: Theme.fontFamily
         font.pixelSize: Theme.fontSize
         text: "100%"
+    }
+
+    // Fixed width for the tooltip's right-aligned percentage column (widest
+    // token) so the output/input rows line up and the popup doesn't jitter.
+    TextMetrics {
+        id: muteMetrics
+        font.family: Theme.fontFamily
+        font.pixelSize: Theme.fontSize - 1
+        text: "Muted"
     }
 
     function volIcon() {
@@ -73,12 +88,68 @@ Item {
     PopupMenu {
         id: menu
         anchorItem: root
-        Text {
-            text: (root.ready && root.sink.description ? root.sink.description : "Audio")
-                  + ": " + (root.muted ? "Muted" : root.volume + "%")
-            color: Theme.fg
-            font.family: Theme.fontFamily
-            font.pixelSize: Theme.fontSize - 1
+        // Output device: icon + description + level, then a drawn meter.
+        RowLayout {
+            Layout.fillWidth: true
+            spacing: 6
+            opacity: root.muted ? 0.5 : 1.0
+            Icon {
+                text: root.volIcon()
+                size: Theme.iconSizeSmall
+            }
+            Text {
+                Layout.fillWidth: true
+                elide: Text.ElideRight
+                text: root.ready && root.sink.description ? root.sink.description : "Audio"
+                color: Theme.fg
+                font.family: Theme.fontFamily
+                font.pixelSize: Theme.fontSize - 1
+            }
+            Text {
+                Layout.preferredWidth: muteMetrics.width
+                horizontalAlignment: Text.AlignRight
+                text: root.muted ? "Muted" : root.volume + "%"
+                color: Theme.fg
+                font.family: Theme.fontFamily
+                font.pixelSize: Theme.fontSize - 1
+            }
+        }
+        VolumeMeter {
+            volume: root.volume
+            muted: root.muted
+        }
+
+        // Default input (mic) — hidden when there is no default source.
+        RowLayout {
+            visible: root.srcReady
+            Layout.fillWidth: true
+            spacing: 6
+            opacity: root.srcMuted ? 0.5 : 1.0
+            Icon {
+                text: root.srcMuted ? Theme.icoMicMute : Theme.icoMicHigh
+                size: Theme.iconSizeSmall
+            }
+            Text {
+                Layout.fillWidth: true
+                elide: Text.ElideRight
+                text: root.srcReady && root.source.description ? root.source.description : "Microphone"
+                color: Theme.fg
+                font.family: Theme.fontFamily
+                font.pixelSize: Theme.fontSize - 1
+            }
+            Text {
+                Layout.preferredWidth: muteMetrics.width
+                horizontalAlignment: Text.AlignRight
+                text: root.srcMuted ? "Muted" : root.srcVolume + "%"
+                color: Theme.fg
+                font.family: Theme.fontFamily
+                font.pixelSize: Theme.fontSize - 1
+            }
+        }
+        VolumeMeter {
+            visible: root.srcReady
+            volume: root.srcVolume
+            muted: root.srcMuted
         }
         MenuButton {
             label: "Open pavucontrol"

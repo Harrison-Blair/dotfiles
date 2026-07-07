@@ -20,7 +20,7 @@
   "verbose": true,
   "preferredNotifChannel": "auto",
   "switchModelsOnFlag": true,
-  "teammateMode": "auto",
+  "teammateMode": "tmux",
   "remoteControlAtStartup": false,
   "inputNeededNotifEnabled": false,
   "agentPushNotifEnabled": true,

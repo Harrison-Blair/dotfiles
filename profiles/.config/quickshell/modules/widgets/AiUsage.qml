@@ -21,6 +21,21 @@ Item {
     function fmtUsd(v) {
         return (v === undefined || v === null) ? "$--" : "$" + v.toFixed(2)
     }
+    // Bar-only $: comma-grouped, fixed width for $9,999.99 (4 integer
+    // digits + 2 decimals). The "$" hugs the number; padding sits to the
+    // left of the "$" so the segment doesn't jiggle as values change.
+    function fmtUsdBar(v) {
+        let s
+        if (v === undefined || v === null) {
+            s = "--"
+        } else {
+            const f = v.toFixed(2)
+            const dot = f.indexOf(".")
+            const grouped = f.slice(0, dot).replace(/\B(?=(\d{3})+(?!\d))/g, ",")
+            s = grouped + f.slice(dot)
+        }
+        return ("$" + s).padStart(9," ")
+    }
     function fmtTok(v) {
         if (v === undefined || v === null) return "--"
         if (v >= 1e6) return (v / 1e6).toFixed(1) + "M"
@@ -49,12 +64,15 @@ Item {
 
     // One percentage, warn/crit-colored; dimmed when the provider is stale.
     function pctSpan(v, dim) {
-        if (v === undefined || v === null) return "--%"
+        // Fixed width for 3 digits + "%" (e.g. "100%"), right-aligned with
+        // non-breaking spaces so the segment doesn't jiggle as values change.
+        const num = (v === undefined || v === null ? "--" : "" + v).padStart(3, " ")
+        if (v === undefined || v === null) return num + "%"
         let color = null
         if (dim) color = Theme.sep
         else if (v >= 90) color = Theme.crit
         else if (v >= 70) color = Theme.warn
-        return color ? '<span style="color:' + color + '">' + v + "%</span>" : v + "%"
+        return color ? '<span style="color:' + color + '">' + num + "%</span>" : num + "%"
     }
     // Bar segment: "session% / weekly% [/ monthly%] $monthly-cost"
     function segText(prov, showMonth) {
@@ -63,7 +81,7 @@ Item {
         const pcts = [l ? l.session_pct : null, l ? l.week_pct : null]
         if (showMonth !== false) pcts.push(l ? l.month_pct : null)
         const cost = prov && prov.usage ? prov.usage.month.cost : null
-        return pcts.map(v => pctSpan(v, dim)).join(" / ") + " " + fmtUsd(cost)
+        return pcts.map(v => pctSpan(v, dim)).join(" / ") + " " + fmtUsdBar(cost)
     }
 
     function usageRow(label, w) {
@@ -75,6 +93,53 @@ Item {
             + usageRow("Today", u.day) + "\n"
             + usageRow("7 days", u.week) + "\n"
             + usageRow("30 days", u.month)
+    }
+    // Comma-grouped $ with no fixed padding (for the per-model tables).
+    function fmtUsdG(v) {
+        if (v === undefined || v === null) return "$--"
+        const f = v.toFixed(2), dot = f.indexOf(".")
+        return "$" + f.slice(0, dot).replace(/\B(?=(\d{3})+(?!\d))/g, ",") + f.slice(dot)
+    }
+    // Model id -> compact label: drop the "claude-" prefix and a trailing
+    // "-YYYYMMDD" date; truncate anything still too wide for the name column.
+    function shortModel(name) {
+        let s = name.replace(/^claude-/, "").replace(/-\d{8}$/, "")
+        return s.length > 15 ? s.slice(0, 14) + "…" : s
+    }
+    function hasModels(p) { return !!(p && p.models && p.models.length > 0) }
+
+    // --- Per-model cost table (allTime adds the "all" column, Claude only) ---
+    function costCols(allTime) { return allTime ? ["day", "week", "month", "all"] : ["day", "week", "month"] }
+    function costHeader(allTime) {
+        const h = allTime ? ["today", "7d", "30d", "all"] : ["today", "7d", "30d"]
+        return "by model".padEnd(15) + h.map(x => x.padStart(10)).join("")
+    }
+    function costRows(models, allTime) {
+        if (!root.hasModels({models: models})) return ""
+        return models.map(m => root.shortModel(m.name).padEnd(15)
+            + root.costCols(allTime).map(c => root.fmtUsdG(m.cost[c]).padStart(10)).join("")).join("\n")
+    }
+    function costTotal(models, allTime) {
+        if (!root.hasModels({models: models})) return ""
+        const sum = c => models.reduce((a, m) => a + (m.cost[c] || 0), 0)
+        return "Total".padEnd(15) + root.costCols(allTime).map(c => root.fmtUsdG(sum(c)).padStart(10)).join("")
+    }
+
+    // --- Per-model token table (in/out over day/7d/30d) ---
+    function tokPair(inTok, outTok) { return fmtTok(inTok) + "/" + fmtTok(outTok) }
+    function tokHeader() {
+        return "tokens in/out".padEnd(15) + ["today", "7d", "30d"].map(x => x.padStart(11)).join("")
+    }
+    function tokRows(models) {
+        if (!root.hasModels({models: models})) return ""
+        return models.map(m => root.shortModel(m.name).padEnd(15)
+            + ["day", "week", "month"].map(c => root.tokPair(m.in[c], m.out[c]).padStart(11)).join("")).join("\n")
+    }
+    function tokTotal(models) {
+        if (!root.hasModels({models: models})) return ""
+        const sum = (k, c) => models.reduce((a, m) => a + (m[k][c] || 0), 0)
+        return "Total".padEnd(15) + ["day", "week", "month"].map(c =>
+            root.tokPair(sum("in", c), sum("out", c)).padStart(11)).join("")
     }
     function claudeLimitsBlock() {
         const lim = root.stats.claude.limits
@@ -192,6 +257,9 @@ Item {
                 id: section
                 required property var modelData
                 required property int index
+                readonly property var p: modelData.p
+                readonly property bool allTime: modelData.title === "Claude Code"
+                readonly property bool showModels: root.hasModels(p) && p.status !== "error"
                 spacing: 4
 
                 Rectangle {
@@ -241,14 +309,81 @@ Item {
                     font.family: Theme.fontFamily
                     font.pixelSize: Theme.fontSize - 2
                 }
+                // Providers without a model breakdown (Cursor): the combined
+                // cost + token totals block.
                 Text {
-                    visible: section.modelData.p.status !== "error"
-                    text: root.usageBlock(section.modelData.p.usage)
+                    visible: section.p.status !== "error" && !root.hasModels(section.p)
+                    text: root.usageBlock(section.p.usage)
                     color: Theme.fg
                     font.family: Theme.fontFamily
                     font.pixelSize: Theme.fontSize - 2
                 }
-            }
+
+                // --- Per-model cost table: dimmed header, rows, rule, Total ---
+                Text {
+                    visible: section.showModels
+                    text: root.costHeader(section.allTime)
+                    color: Theme.sep
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.fontSize - 2
+                }
+                Text {
+                    visible: section.showModels
+                    text: root.costRows(section.p.models, section.allTime)
+                    color: Theme.fg
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.fontSize - 2
+                }
+                Rectangle {
+                    visible: section.showModels
+                    Layout.fillWidth: true
+                    Layout.topMargin: 2
+                    Layout.bottomMargin: 2
+                    implicitHeight: 1
+                    color: Theme.sep
+                }
+                Text {
+                    visible: section.showModels
+                    text: root.costTotal(section.p.models, section.allTime)
+                    color: Theme.fg
+                    font.bold: true
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.fontSize - 2
+                }
+
+                // --- Per-model token table: dimmed header, rows, rule, Total ---
+                Text {
+                    visible: section.showModels
+                    Layout.topMargin: 2
+                    text: root.tokHeader()
+                    color: Theme.sep
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.fontSize - 2
+                }
+                Text {
+                    visible: section.showModels
+                    text: root.tokRows(section.p.models)
+                    color: Theme.fg
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.fontSize - 2
+                }
+                Rectangle {
+                    visible: section.showModels
+                    Layout.fillWidth: true
+                    Layout.topMargin: 2
+                    Layout.bottomMargin: 2
+                    implicitHeight: 1
+                    color: Theme.sep
+                }
+                Text {
+                    visible: section.showModels
+                    text: root.tokTotal(section.p.models)
+                    color: Theme.fg
+                    font.bold: true
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.fontSize - 2
+                }
+}
         }
         Text {
             visible: !root.stats

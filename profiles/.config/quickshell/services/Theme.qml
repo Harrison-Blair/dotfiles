@@ -34,6 +34,8 @@ Singleton {
     readonly property color crit: "#dd532e"                     // critical red
     readonly property color wifiWeak: "#ffffa5"                 // weak signal yellow
     readonly property color wifiBad: "#dd532e"                  // bad signal red
+    readonly property color netDown: "#ff5f5f"                  // download rate red
+    readonly property color netUp: "#5fd75f"                    // upload rate green
     readonly property color accent: Qt.rgba(175/255, 75/255, 175/255, 1.0)
     readonly property color aiClaude: "#d97757"               // Claude brand orange
     readonly property color aiCursor: "#cccccc"               // Cursor gray/white
@@ -53,6 +55,8 @@ Singleton {
     readonly property string icoVolLow:  String.fromCodePoint(0xF057F)
     readonly property string icoVolMid:  String.fromCodePoint(0xF0580)  // md volume-medium
     readonly property string icoVolHigh: String.fromCodePoint(0xF057E)  // md volume-high
+    readonly property string icoMicHigh: String.fromCodePoint(0xF036C)  // md microphone
+    readonly property string icoMicMute: String.fromCodePoint(0xF036D)  // md microphone-off
 
     readonly property string icoNetDown: String.fromCodePoint(0xF0045)  // md arrow-down
     readonly property string icoNetUp:   String.fromCodePoint(0xF005D)  // md arrow-up
