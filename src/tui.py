@@ -29,6 +29,7 @@ REPO_ROOT = (
     else Path(__file__).resolve().parent.parent
 )
 PROFILES_DIR = REPO_ROOT / "profiles"
+HOSTS_DIR = PROFILES_DIR / "hosts"
 DATA_DIR = REPO_ROOT / "config"
 CACHE_DIR = DATA_DIR / "cache"
 CACHE_VERSION = 1
@@ -90,6 +91,15 @@ def load_includes() -> dict[str, list[str]]:
     except (FileNotFoundError, tomllib.TOMLDecodeError):
         return {}
     return data.get("includes", {})
+
+
+def load_overrides() -> dict[str, list[str]]:
+    try:
+        with (DATA_DIR / "hosts.toml").open("rb") as f:
+            data = tomllib.load(f)
+    except (FileNotFoundError, tomllib.TOMLDecodeError):
+        return {}
+    return data.get("overrides", {})
 
 
 def cache_path() -> Path:
@@ -484,21 +494,57 @@ def copy_folder(
             shutil.copy2(s, t, follow_symlinks=False)
 
 
-def apply_key(key: str, ts: str) -> None:
+def relocate_overrides(key: str, hostname: str, overrides: dict[str, list[str]]) -> None:
+    """Move declared per-machine paths out of the shared profiles/<key> copy
+    into this host's tree under profiles/hosts/<hostname>/."""
+    for rel in overrides.get(key, []):
+        shared = PROFILES_DIR / key / rel
+        if not shared.exists() and not shared.is_symlink():
+            continue
+        hdst = HOSTS_DIR / hostname / key / rel
+        _remove(hdst)
+        hdst.parent.mkdir(parents=True, exist_ok=True)
+        shared.rename(hdst)
+        console.print(f"  host [magenta]{key}/{rel} -> hosts/{hostname}[/magenta]")
+
+
+def _copy_any(src: Path, dst: Path) -> None:
+    if src.is_dir() and not src.is_symlink():
+        shutil.copytree(src, dst, symlinks=True)
+    else:
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(src, dst, follow_symlinks=False)
+
+
+def apply_key(key: str, ts: str, overrides: dict[str, list[str]], hostname: str) -> None:
     src = PROFILES_DIR / key
     if not src.exists():
         console.print(f"[red]Missing {src}, skipping.[/red]")
         return
     dst = HOME / key
+    bak: Path | None = None
     if dst.exists() or dst.is_symlink():
         bak = dst.with_name(f"{dst.name}.bak-{ts}")
         dst.rename(bak)
         console.print(f"  backup [dim]{key} -> {bak.name}[/dim]")
     dst.parent.mkdir(parents=True, exist_ok=True)
-    if src.is_dir() and not src.is_symlink():
-        shutil.copytree(src, dst, symlinks=True)
-    else:
-        shutil.copy2(src, dst, follow_symlinks=False)
+    _copy_any(src, dst)
+    overlay = HOSTS_DIR / hostname / key
+    if overlay.is_dir():
+        shutil.copytree(overlay, dst, symlinks=True, dirs_exist_ok=True)
+    for rel in overrides.get(key, []):
+        t = dst / rel
+        if t.exists() or t.is_symlink():
+            continue
+        b = bak / rel if bak else None
+        if b is not None and (b.exists() or b.is_symlink()):
+            _copy_any(b, t)
+            console.print(f"  kept local [yellow]{key}/{rel}[/yellow] (no override for {hostname})")
+        else:
+            console.print(
+                f"[yellow]  warning: {key}/{rel} has no override for {hostname} "
+                f"and no local copy — configure it and sync[/yellow]"
+            )
     console.print(f"  applied [cyan]{key}[/cyan]")
 
 
@@ -518,6 +564,7 @@ def cmd_sync(_: argparse.Namespace) -> None:
     hostname = socket.gethostname()
     ignore = load_ignore()
     includes = load_includes()
+    overrides = load_overrides()
     nodes = build_sync_tree(ignore)
     if not nodes:
         console.print("[yellow]Nothing to sync.[/yellow]")
@@ -546,6 +593,7 @@ def cmd_sync(_: argparse.Namespace) -> None:
             console.print(f"[red]Missing {src}, skipping.[/red]")
             continue
         copy_folder(src, PROFILES_DIR / key, includes.get(key), ignore)
+        relocate_overrides(key, hostname, overrides)
         console.print(f"  copied [cyan]{key}[/cyan]")
 
     rel = PROFILES_DIR.relative_to(REPO_ROOT)
@@ -607,7 +655,9 @@ def _all_backups() -> list[Path]:
 
 
 def cmd_apply(args: argparse.Namespace) -> None:
+    hostname = socket.gethostname()
     ignore = load_ignore()
+    overrides = load_overrides()
     nodes = build_apply_tree(ignore)
     ts = datetime.now().strftime("%Y%m%d-%H%M%S")
 
@@ -618,7 +668,7 @@ def cmd_apply(args: argparse.Namespace) -> None:
             console.print(f"[red]Not found in profiles/: {', '.join(missing)}[/red]")
             return
         for key in args.apply:
-            apply_key(key, ts)
+            apply_key(key, ts, overrides, hostname)
         return
 
     backups = _all_backups()
@@ -642,7 +692,7 @@ def cmd_apply(args: argparse.Namespace) -> None:
             return
         save_cache("apply", keys)
         for key in keys:
-            apply_key(key, ts)
+            apply_key(key, ts, overrides, hostname)
         return
 
     if backups:
@@ -713,6 +763,8 @@ def cmd_clean_profile(_: argparse.Namespace) -> None:
         return
     for key in keys:
         _remove(PROFILES_DIR / key)
+        for h in HOSTS_DIR.glob(f"*/{key}"):
+            _remove(h)
         console.print(f"  removed [cyan]{key}[/cyan]")
 
     rel = PROFILES_DIR.relative_to(REPO_ROOT)

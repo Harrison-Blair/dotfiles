@@ -14,10 +14,14 @@ Run with no arguments for an interactive menu (Sync to cloud / Apply from profil
 profile / Clean backups / Quit), or use flags directly (mutually exclusive):
 
 - `-s`, `--sync` — copy selected folders from `~` into `profiles/`, then `git pull --rebase`,
-  commit (`Sync from <host> at <time> by <user>`), and push.
+  commit (`Sync from <host> at <time> by <user>`), and push. Paths declared in
+  `config/hosts.toml` are stored per-machine under `profiles/hosts/<hostname>/` instead of the
+  shared tree.
 - `-a`, `--apply [NAME...]` — restore folders from `profiles/` into `~` (backs up anything it
   replaces to `<name>.bak-<timestamp>`). With no names it's interactive; pass home-relative
-  names (e.g. `.config/hypr`, `.claude`) for a non-interactive apply.
+  names (e.g. `.config/hypr`, `.claude`) for a non-interactive apply. After the shared copy,
+  this machine's `profiles/hosts/<hostname>/` files are overlaid on top; declared override
+  paths this host has no copy of are kept from the local backup instead.
 - `-c`, `--clean-backups` — list and delete `*.bak-*` left in `~` and `~/.config`.
 - `-P`, `--clean-profile` — delete selected folders **from** `profiles/` (parts or the whole
   `.config`, same selection rules as sync), then `git pull --rebase`, commit (`Clean profile
@@ -50,6 +54,10 @@ empty so a cached selection can't cause an accidental delete).
 - `config/includes.toml` — per-folder copy whitelists. By default `.claude` only syncs
   `agents/`, `commands/`, `teams/`, `plugins/`, `CLAUDE.md`, `settings.json`,
   `statusline-command.sh` (so its caches/history/projects stay out of the repo).
+- `config/hosts.toml` — per-machine override paths, keyed by folder like `includes.toml`.
+  Declared paths live under `profiles/hosts/<hostname>/<folder>/...` (one copy per machine)
+  instead of the shared snapshot, so machine-specific files (monitor layout, GPU env vars)
+  never clobber another machine's on sync.
 
 ### Building
 
