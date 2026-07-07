@@ -23,6 +23,7 @@ ignore = [
   "1Password",
   "VSCodium",
   "BraveSoftware",
+  "calcifer",
   "chromium",
   "dconf",
   "discord",
