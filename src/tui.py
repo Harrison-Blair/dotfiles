@@ -177,6 +177,27 @@ def build_apply_tree(ignore: set[str]) -> list[Node]:
     return _build_tree(PROFILES_DIR, ignore)
 
 
+def prune_ignored(ignore: set[str]) -> list[str]:
+    """Delete folders under profiles/ whose name is in `ignore`, mirroring the
+    name matching in _build_tree (top-level dotfolders + .config subdirs). Catches
+    a folder ignored *after* it was once synced: its orphaned copy would otherwise
+    be re-committed forever by cmd_sync's `git add -f`. Returns pruned keys."""
+    pruned: list[str] = []
+    if not PROFILES_DIR.is_dir():
+        return pruned
+    for p in PROFILES_DIR.iterdir():
+        if p.is_dir() and p.name.startswith(".") and p.name in ignore:
+            _remove(p)
+            pruned.append(p.name)
+    config = PROFILES_DIR / ".config"
+    if config.is_dir():
+        for c in config.iterdir():
+            if c.is_dir() and c.name in ignore:
+                _remove(c)
+                pruned.append(f".config/{c.name}")
+    return pruned
+
+
 def _config_whole(nodes: list[Node]) -> bool:
     return any(n.is_parent and n.key == ".config" and n.checked for n in nodes)
 
@@ -595,6 +616,9 @@ def cmd_sync(_: argparse.Namespace) -> None:
         copy_folder(src, PROFILES_DIR / key, includes.get(key), ignore)
         relocate_overrides(key, hostname, overrides)
         console.print(f"  copied [cyan]{key}[/cyan]")
+
+    for key in prune_ignored(ignore):
+        console.print(f"  pruned ignored [yellow]{key}[/yellow]")
 
     rel = PROFILES_DIR.relative_to(REPO_ROOT)
     if not _git("add", "-f", "--", str(rel)):
