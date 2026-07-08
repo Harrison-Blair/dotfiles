@@ -7,8 +7,8 @@ A repository to hold my dotfiles and a little helper tool I had claude build to 
 
 ## TUI
 
-`tui` (built from `src/tui.py`) copies config folders between your live home directory and
-versioned snapshots in `profiles/`.
+`tui` (built from the Rust sources in `src/`) copies config folders between your live home
+directory and versioned snapshots in `profiles/`.
 
 Run with no arguments for an interactive menu (Sync to cloud / Apply from profiles / Clean
 profile / Clean backups / Quit), or use flags directly (mutually exclusive):
@@ -28,7 +28,6 @@ profile / Clean backups / Quit), or use flags directly (mutually exclusive):
   from <host> at <time> by <user>: <folders>`), and push. The checkbox list annotates each
   folder with when it was last synced, from where, and by whom (read from git history); a
   confirmation prompt guards the deletion.
-- `-v`, `--verbose` — enable verbose output.
 
 When apply finds nothing selected from `profiles/`, it falls back to an interactive list of
 the `*.bak-*` backups in `~` and `~/.config` and restores the one you pick (re-backing up the
@@ -61,14 +60,16 @@ empty so a cached selection can't cause an accidental delete).
 
 ### Building
 
-The `tui` binary at the repo root is a PyInstaller `--onefile` build of `src/tui.py`,
-committed by the **Build Tui Helper** GitHub Actions workflow
-(`.github/workflows/build-tui.yml`) on pushes that touch `src/tui.py`, `src/tui.spec`,
-`pyproject.toml`, or the workflow itself (commit message `Build tui binary [skip ci]`).
+The tool is a Rust CLI (`src/main.rs` + modules). The `tui` binary at the repo root is a
+static `x86_64-unknown-linux-musl` release build, committed by the **Build Tui Helper** GitHub
+Actions workflow (`.github/workflows/build-tui.yml`) on pushes that touch `Cargo.toml`,
+`Cargo.lock`, `src/**`, or the workflow itself (commit message `Build tui binary [skip ci]`).
+Being statically linked, it runs on any x86_64 Linux with no runtime dependencies.
 
-To build locally: `pyinstaller --onefile --name tui --console src/tui.py` (deps:
-`rich==15.0.0`, `pyinstaller`; Python version pinned in `.python-version`; `src/tui.spec` is
-the generated spec).
+To build locally: `cargo build --release --target x86_64-unknown-linux-musl` (needs the musl
+target — `rustup target add x86_64-unknown-linux-musl` — and `musl-tools`). A plain
+`cargo build --release` also works for a dynamically-linked local binary. Run from source with
+`cargo run -- --sync` etc.
 
 Nothing is baked into the binary — it reads `config/*.toml` and writes `profiles/` relative to
 its own location, so the `tui` binary must live at the repo root.
