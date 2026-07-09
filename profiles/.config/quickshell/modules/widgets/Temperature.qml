@@ -15,11 +15,9 @@ Item {
     Layout.alignment: Qt.AlignVCenter
 
     property string sensorsText: ""
-    property string nvidiaText: ""
     property var groups: []          // [{header, icon, rows:[{label,val,crit,icon}]}]
     property var headline: []        // [{icon, temp, crit}]
     property bool anyCritical: false
-    property bool hasNvidia: false   // detected once; avoids polling a missing binary
 
     function rebuild() {
         let data = {}
@@ -119,8 +117,11 @@ Item {
             if (rows.length) groups.push({ header: header, tag: tag, icon: chipIcon, rows: rows })
         }
 
-        // NVIDIA via nvidia-smi
-        const nv = parseInt((root.nvidiaText || "").trim())
+        // NVIDIA temp comes from the shared GpuInfo poller (no separate nvidia-smi
+        // call here — that would independently wake the dGPU on battery). Omitted
+        // while the GPU is runtime-suspended: it's powered off and cool.
+        const nv = (GpuInfo.vendor === "nvidia" && !GpuInfo.suspended && GpuInfo.temp != null)
+                 ? GpuInfo.temp : NaN
         if (!isNaN(nv)) {
             const crit = nv >= Theme.critDgpu
             if (crit) anyCrit = true
@@ -185,24 +186,17 @@ Item {
             onStreamFinished: { root.sensorsText = this.text; root.rebuild() }
         }
     }
-    Process {
-        id: nvidiaProc
-        command: ["nvidia-smi", "--query-gpu=temperature.gpu", "--format=csv,noheader,nounits"]
-        stdout: StdioCollector {
-            onStreamFinished: { root.nvidiaText = this.text; root.rebuild() }
-        }
+    // GPU temp is supplied by the shared GpuInfo poller; rebuild whenever it
+    // changes so the section updates between sensors polls.
+    Connections {
+        target: GpuInfo
+        function onTempChanged() { root.rebuild() }
+        function onSuspendedChanged() { root.rebuild() }
     }
-    // One-time probe so we only poll nvidia-smi on machines that have it.
-    Process {
-        id: nvidiaProbe
-        command: ["sh", "-c", "command -v nvidia-smi"]
-        onExited: (code, status) => { root.hasNvidia = (code === 0) }
-    }
-    Component.onCompleted: nvidiaProbe.running = true
 
     Timer {
         interval: 2000; running: true; repeat: true; triggeredOnStart: true
-        onTriggered: { sensorsProc.running = true; if (root.hasNvidia) nvidiaProc.running = true }
+        onTriggered: sensorsProc.running = true
     }
 
     RowLayout {

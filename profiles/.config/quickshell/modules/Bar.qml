@@ -38,14 +38,14 @@ PanelWindow {
         Gpu { visible: !bar.portrait }
         Separator { visible: !bar.portrait }
         Temperature { visible: !bar.portrait }
-        Separator { visible: battery.present && !bar.portrait }
-        Battery { id: battery; visible: present && !bar.portrait }
         Separator { visible: !bar.portrait }
         AiUsage { visible: !bar.portrait }
         Separator {}
         Clock {}
         Separator {}
         Audio {}
+        Separator { visible: battery.present && !bar.portrait }
+        Battery { id: battery; visible: present && !bar.portrait }
         Separator { visible: !bar.portrait }
         Screenshot { visible: !bar.portrait }
         Separator {}

@@ -26,19 +26,22 @@ Item {
     readonly property color dimFg: Qt.rgba(1, 1, 1, 0.75)
     readonly property color faintFg: Qt.rgba(1, 1, 1, 0.5)
 
-    // World clocks. Local + UTC need no subprocess; the rest are filled from
-    // tzOffsets once the batched `date` Process returns (fallback: those rows hide).
+    // World clocks, each row labelled "CODE [UTC±off] · City". Local + UTC need no
+    // subprocess; the rest are filled from tzOffsets/tzAbbrevs once the batched
+    // `date` Process returns (fallback: those rows hide until then).
     readonly property var zones: [
-        { label: "Local",       key: "" },
-        { label: "UTC",         key: "UTC" },
-        { label: "Los Angeles", key: "America/Los_Angeles" },
-        { label: "New York",    key: "America/New_York" },
-        { label: "London",      key: "Europe/London" },
-        { label: "Tokyo",       key: "Asia/Tokyo" },
-        { label: "New Delhi",   key: "Asia/Kolkata" }
+        { city: "Local",       key: "" },
+        { city: "",            key: "UTC" },
+        { city: "Los Angeles", key: "America/Los_Angeles" },
+        { city: "New York",    key: "America/New_York" },
+        { city: "London",      key: "Europe/London" },
+        { city: "Tokyo",       key: "Asia/Tokyo" },
+        { city: "New Delhi",   key: "Asia/Kolkata" }
     ]
     // { "America/New_York": -240, ... } minutes east of UTC. Empty until fetched.
     property var tzOffsets: ({})
+    // { "America/New_York": "EDT", ... } zone abbreviations. Empty until fetched.
+    property var tzAbbrevs: ({})
     property real uptimeSecs: 0
 
     function pad(n) { return n < 10 ? "0" + n : "" + n }
@@ -66,6 +69,28 @@ Item {
         const p = zoneParts(offsetMin)
         return pad(p.h) + ":" + pad(p.m)
     }
+    // "UTC-8" / "UTC+5:30" from minutes east of UTC.
+    function fmtOffset(min) {
+        const sign = min < 0 ? "-" : "+"
+        const a = Math.abs(min), h = Math.floor(a / 60), m = a % 60
+        return "UTC" + sign + h + (m ? ":" + pad(m) : "")
+    }
+    // Zone abbreviation: Qt's "t" for Local, fixed for UTC, else the fetched map.
+    function zoneCode(z) {
+        if (z.key === "") return Qt.formatDateTime(root.now, "t")
+        if (z.key === "UTC") return "UTC"
+        return root.tzAbbrevs[z.key] || ""
+    }
+    // Composed row label "CODE [UTC±off] · City" (parts omitted until known).
+    function zoneLabel(z) {
+        if (!z) return ""                       // transient during Repeater rebuild
+        const off = root.offsetFor(z.key)
+        let s = root.zoneCode(z)
+        if (off !== undefined) s += (s ? " " : "") + "[" + root.fmtOffset(off) + "]"
+        if (z.city) s += (s ? " · " : "") + z.city
+        return s
+    }
+
     // "+1d" / "-1d" when the zone's calendar day differs from local.
     function zoneMarker(offsetMin) {
         const localKey = zoneParts(-root.now.getTimezoneOffset()).key
@@ -109,18 +134,20 @@ Item {
     Process {
         id: tzProc
         command: ["sh", "-c",
-            "for z in America/Los_Angeles America/New_York Europe/London Asia/Tokyo Asia/Kolkata; do printf '%s %s\\n' \"$z\" \"$(TZ=$z date +%z)\"; done"]
+            "for z in America/Los_Angeles America/New_York Europe/London Asia/Tokyo Asia/Kolkata; do printf '%s %s %s\\n' \"$z\" \"$(TZ=$z date +%Z)\" \"$(TZ=$z date +%z)\"; done"]
         stdout: StdioCollector {
             onStreamFinished: {
-                const map = {}
+                const offs = {}, abbr = {}
                 for (const line of this.text.split("\n")) {
-                    const m = line.match(/^(\S+)\s+([+-]\d{4})$/)
+                    const m = line.match(/^(\S+)\s+(\S+)\s+([+-]\d{4})$/)
                     if (m) {
-                        const sign = m[2][0] === "-" ? -1 : 1
-                        map[m[1]] = sign * (parseInt(m[2].substr(1, 2)) * 60 + parseInt(m[2].substr(3, 2)))
+                        abbr[m[1]] = m[2]
+                        const sign = m[3][0] === "-" ? -1 : 1
+                        offs[m[1]] = sign * (parseInt(m[3].substr(1, 2)) * 60 + parseInt(m[3].substr(3, 2)))
                     }
                 }
-                root.tzOffsets = map
+                root.tzOffsets = offs
+                root.tzAbbrevs = abbr
             }
         }
     }
@@ -308,7 +335,7 @@ Item {
                 model: root.zones
                 ClockRow {
                     visible: root.offsetFor(modelData.key) !== undefined
-                    label: modelData.label
+                    label: root.zoneLabel(modelData)
                     offsetMin: root.offsetFor(modelData.key) || 0
                 }
             }

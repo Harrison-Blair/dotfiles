@@ -42,8 +42,13 @@ for Arch.
 
 ### Optional
 
-- `nvidia-utils` — only for GPU temperature in `Temperature.qml` (it probes
-  `command -v nvidia-smi` and silently skips GPU temp if absent).
+- `nvidia-utils` — on NVIDIA machines, powers the GPU usage widget (`Gpu.qml`) and
+  GPU temperature (`Temperature.qml`) via `nvidia-smi`. Both are driven by the
+  `services/GpuInfo.qml` singleton, which detects the discrete GPU from sysfs and
+  skips polling while it is runtime-suspended (RTD3), so an idle laptop dGPU isn't
+  kept awake. Silently absent when the tools/GPU aren't present.
+- `amdgpu_top` (AUR) — the per-engine / per-process breakdown in `Gpu.qml`'s tooltip
+  on AMD machines (the panel busy% + VRAM come from sysfs without it).
 
 ## Layout
 

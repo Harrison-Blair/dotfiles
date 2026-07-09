@@ -190,23 +190,6 @@ Item {
             color: Theme.fg
             font.family: Theme.fontFamily
             font.pixelSize: Theme.fontSize
-        }
-        Text {
-            text: "|"
-            color: Theme.sep
-            font.family: Theme.fontFamily
-            font.pixelSize: Theme.fontSize
-        }
-        Icon {
-            text: Theme.icoOpencode
-            color: Theme.fg
-        }
-        Text {
-            textFormat: Text.RichText
-            text: root.segText(root.stats ? root.stats.opencode : null)
-            color: Theme.fg
-            font.family: Theme.fontFamily
-            font.pixelSize: Theme.fontSize
             Layout.rightMargin: 2
         }
     }
