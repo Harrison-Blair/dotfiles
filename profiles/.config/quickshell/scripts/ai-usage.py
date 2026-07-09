@@ -61,7 +61,9 @@ def model_entry(name, mw):
         "out": dict(mw["out"]),
     }
 
-# OpenCode Go plan: $ limits per rolling window (opencode.ai/docs/go/).
+# OpenCode Go plan (opencode.ai/docs/go/): $ caps for the 5h/weekly/monthly
+# windows. The 5h window is rolling; weekly/monthly are fixed windows anchored
+# to the subscription start (approximated by the earliest opencode-go message).
 OPENCODE_GO_LIMITS = (12.0, 30.0, 60.0)
 OPENCODE_GO_WINDOWS_H = (5, 7 * 24, 30 * 24)
 
@@ -141,8 +143,8 @@ def local_dates(days):
 
 
 def window_resets_at(oldest_ms, hours):
-    """Local "resets at" ISO for a rolling window: when the oldest in-window
-    request ages out. None when the window is empty."""
+    """Local "resets at" ISO: window start (or oldest in-window request for a
+    rolling window) plus the window duration. None when the start is unknown."""
     if not oldest_ms:
         return None
     return datetime.fromtimestamp((oldest_ms + hours * 3600_000) / 1000).strftime("%Y-%m-%dT%H:%M:%S")
@@ -312,6 +314,68 @@ def claude_limits(state, now, fresh, running):
     return data, "ok", None
 
 
+STATUSLINE_CAPTURE = os.path.join(HOME, ".local", "state", "claude-usage",
+                                  "capture.json")
+
+
+def read_statusline_capture():
+    """Latest official rate_limits reading persisted by statusline-command.sh
+    on every statusline repaint. Percentages outside 0-100 are dropped (a
+    Claude Code bug can briefly leak a timestamp into the field). Returns
+    None when the file is missing or has no usable percentage."""
+    try:
+        with open(STATUSLINE_CAPTURE) as f:
+            cap = json.load(f)
+    except (OSError, ValueError):
+        return None
+    if not isinstance(cap.get("captured_at"), (int, float)):
+        return None
+    for k in ("five_hour_pct", "seven_day_pct"):
+        v = cap.get(k)
+        if not isinstance(v, (int, float)) or not 0 <= v <= 100:
+            cap[k] = None
+    if cap["five_hour_pct"] is None and cap["seven_day_pct"] is None:
+        return None
+    return cap
+
+
+def merge_statusline_limits(limits):
+    """Freshest-wins merge of the statusline capture into the OAuth limits.
+
+    The capture covers only the 5h/weekly numbers but refreshes on every
+    statusline repaint (vs API_TTL for the OAuth endpoint), so it usually
+    wins during a live session; OAuth keeps the opus/extra/plan enrichment.
+    Tags limits with source/source_at for the widget's provenance line.
+    """
+    cap = read_statusline_capture()
+    if limits is not None:
+        limits = dict(limits, source="api", source_at=limits.get("fetched_at"))
+    if cap is None:
+        return limits
+    if limits is None:
+        limits = {"session_pct": None, "session_resets_at": None,
+                  "week_pct": None, "week_resets_at": None,
+                  "week_opus_pct": None, "month_pct": None, "plan": None}
+    elif cap["captured_at"] <= (limits.get("fetched_at") or 0):
+        return limits
+
+    def iso(epoch):
+        try:
+            return datetime.fromtimestamp(epoch).strftime("%Y-%m-%dT%H:%M:%S")
+        except (TypeError, ValueError, OSError, OverflowError):
+            return None
+
+    if cap["five_hour_pct"] is not None:
+        limits["session_pct"] = round(cap["five_hour_pct"])
+        limits["session_resets_at"] = iso(cap.get("five_hour_reset"))
+    if cap["seven_day_pct"] is not None:
+        limits["week_pct"] = round(cap["seven_day_pct"])
+        limits["week_resets_at"] = iso(cap.get("seven_day_reset"))
+    limits["source"] = "statusline"
+    limits["source_at"] = int(cap["captured_at"])
+    return limits
+
+
 def get_claude(state, now, fresh, running):
     out = {"status": "ok", "error": None, "limits": None,
            "usage": {w: dict(EMPTY_WINDOW) for w in ("day", "week", "month")},
@@ -321,6 +385,7 @@ def get_claude(state, now, fresh, running):
     except Exception as e:
         return {**out, "status": "error", "error": "transcript scan failed: " + type(e).__name__}
     out["limits"], out["status"], out["error"] = claude_limits(state, now, fresh, running)
+    out["limits"] = merge_statusline_limits(out["limits"])
     return out
 
 
@@ -507,6 +572,14 @@ def get_opencode(state, now):
             "SELECT id, time_updated, data FROM message"
             " WHERE time_updated > ? AND time_created >= ?",
             (oc["cursor"], month_ago_ms)).fetchall()
+        # Subscription-start anchor for the fixed weekly/monthly windows:
+        # earliest opencode-go message ever, queried once and cached.
+        if not state.get("opencode_go_epoch"):
+            (epoch_ms,) = con.execute(
+                "SELECT min(time_created) FROM message"
+                " WHERE data LIKE '%\"providerID\":\"opencode-go\"%'").fetchone()
+            if epoch_ms:
+                state["opencode_go_epoch"] = epoch_ms
         con.close()
     except sqlite3.Error as e:
         return {"status": "error", "error": "opencode db: " + type(e).__name__,
@@ -539,22 +612,30 @@ def get_opencode(state, now):
     pi_records = pi_scan(state, now_ms)
 
     windows = {"day": local_dates(1), "week": local_dates(7), "month": local_dates(30)}
-    # Rolling opencode-go spend for the Go plan limit windows (5h/7d/30d).
+    # Go plan spend per limit window: rolling 5h, plus fixed weekly/monthly
+    # windows anchored to the subscription start (matches the dashboard, which
+    # counts down to a fixed reset rather than aging out a rolling window).
     go_spend = [0.0, 0.0, 0.0]
-    # Oldest in-window request per window; the window begins to free up at
-    # oldest + window duration (a local "resets at" approximation).
-    go_oldest = [None, None, None]
+    go_starts = [now_ms - OPENCODE_GO_WINDOWS_H[0] * 3600_000, None, None]
+    epoch = state.get("opencode_go_epoch")
+    if epoch and epoch <= now_ms:
+        for i in (1, 2):
+            period = OPENCODE_GO_WINDOWS_H[i] * 3600_000
+            go_starts[i] = epoch + (now_ms - epoch) // period * period
+    # Oldest request in the rolling 5h window; it begins to free up at
+    # oldest + 5h (a local "resets at" approximation).
+    go_oldest_5h = None
     # Per-model cost + tokens across windows (no all-time: msgs pruned to 30d).
     model_windows = {}
     for rec in list(oc["msgs"].values()) + pi_records:
         created, cost, tin, tout, cread, cwrite, is_go = rec[:7]
         model = rec[7] if len(rec) > 7 else "?"
         if is_go:
-            for i, hours in enumerate(OPENCODE_GO_WINDOWS_H):
-                if created >= now_ms - hours * 3600_000:
+            for i, start in enumerate(go_starts):
+                if start is not None and created >= start:
                     go_spend[i] += cost
-                    if go_oldest[i] is None or created < go_oldest[i]:
-                        go_oldest[i] = created
+                    if i == 0 and (go_oldest_5h is None or created < go_oldest_5h):
+                        go_oldest_5h = created
         date = str(datetime.fromtimestamp(created / 1000).date())
         for w, dates in windows.items():
             if date not in dates:
@@ -584,9 +665,9 @@ def get_opencode(state, now):
         "session_usd": round(go_spend[0], 2),
         "week_usd": round(go_spend[1], 2),
         "month_usd": round(go_spend[2], 2),
-        "session_resets_at": window_resets_at(go_oldest[0], OPENCODE_GO_WINDOWS_H[0]),
-        "week_resets_at": window_resets_at(go_oldest[1], OPENCODE_GO_WINDOWS_H[1]),
-        "month_resets_at": window_resets_at(go_oldest[2], OPENCODE_GO_WINDOWS_H[2]),
+        "session_resets_at": window_resets_at(go_oldest_5h, OPENCODE_GO_WINDOWS_H[0]),
+        "week_resets_at": window_resets_at(go_starts[1], OPENCODE_GO_WINDOWS_H[1]),
+        "month_resets_at": window_resets_at(go_starts[2], OPENCODE_GO_WINDOWS_H[2]),
     }
     return {"status": "ok", "error": None, "usage": usage, "limits": limits,
             "models": models_out}

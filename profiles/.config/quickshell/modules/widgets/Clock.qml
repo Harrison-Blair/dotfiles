@@ -31,7 +31,12 @@ Item {
     readonly property var zones: [
         { label: "Local",       key: "" },
         { label: "UTC",         key: "UTC" },
+        { label: "Honolulu",    key: "Pacific/Honolulu" },
+        { label: "Anchorage",   key: "America/Anchorage" },
         { label: "Los Angeles", key: "America/Los_Angeles" },
+        { label: "Denver",      key: "America/Denver" },
+        { label: "Phoenix",     key: "America/Phoenix" },
+        { label: "Chicago",     key: "America/Chicago" },
         { label: "New York",    key: "America/New_York" },
         { label: "London",      key: "Europe/London" },
         { label: "Tokyo",       key: "Asia/Tokyo" },
@@ -39,6 +44,8 @@ Item {
     ]
     // { "America/New_York": -240, ... } minutes east of UTC. Empty until fetched.
     property var tzOffsets: ({})
+    // { "America/New_York": "EDT", ... } DST-aware abbreviation. Empty until fetched.
+    property var tzAbbrevs: ({})
     property real uptimeSecs: 0
 
     function pad(n) { return n < 10 ? "0" + n : "" + n }
@@ -55,6 +62,12 @@ Item {
         if (key === "") return -root.now.getTimezoneOffset()
         if (key === "UTC") return 0
         return root.tzOffsets[key]
+    }
+    // Timezone abbreviation for a zone key ("" for local/unknown).
+    function abbrevFor(key) {
+        if (key === "") return Qt.formatDateTime(root.now, "t")
+        if (key === "UTC") return "UTC"
+        return root.tzAbbrevs[key] || ""
     }
     // Wall-clock parts for a given offset, read via UTC fields after shifting.
     function zoneParts(offsetMin) {
@@ -109,18 +122,20 @@ Item {
     Process {
         id: tzProc
         command: ["sh", "-c",
-            "for z in America/Los_Angeles America/New_York Europe/London Asia/Tokyo Asia/Kolkata; do printf '%s %s\\n' \"$z\" \"$(TZ=$z date +%z)\"; done"]
+            "for z in Pacific/Honolulu America/Anchorage America/Los_Angeles America/Denver America/Phoenix America/Chicago America/New_York Europe/London Asia/Tokyo Asia/Kolkata; do printf '%s %s %s\\n' \"$z\" \"$(TZ=$z date +%z)\" \"$(TZ=$z date +%Z)\"; done"]
         stdout: StdioCollector {
             onStreamFinished: {
-                const map = {}
+                const offsets = {}, abbrevs = {}
                 for (const line of this.text.split("\n")) {
-                    const m = line.match(/^(\S+)\s+([+-]\d{4})$/)
+                    const m = line.match(/^(\S+)\s+([+-]\d{4})\s+(\S+)$/)
                     if (m) {
                         const sign = m[2][0] === "-" ? -1 : 1
-                        map[m[1]] = sign * (parseInt(m[2].substr(1, 2)) * 60 + parseInt(m[2].substr(3, 2)))
+                        offsets[m[1]] = sign * (parseInt(m[2].substr(1, 2)) * 60 + parseInt(m[2].substr(3, 2)))
+                        abbrevs[m[1]] = m[3]
                     }
                 }
-                root.tzOffsets = map
+                root.tzOffsets = offsets
+                root.tzAbbrevs = abbrevs
             }
         }
     }
@@ -214,6 +229,7 @@ Item {
     component ClockRow: RowLayout {
         property string label
         property int offsetMin: 0
+        property string abbrev
         Layout.fillWidth: true
         spacing: 8
         Text {
@@ -221,6 +237,13 @@ Item {
             color: root.dimFg
             font.family: Theme.fontFamily
             font.pixelSize: Theme.fontSize - 1
+        }
+        Text {
+            text: parent.abbrev
+            color: root.faintFg
+            font.family: Theme.fontFamily
+            font.pixelSize: Theme.fontSize - 3
+            Layout.alignment: Qt.AlignVCenter
         }
         Item { Layout.fillWidth: true }
         Text {
@@ -310,6 +333,7 @@ Item {
                     visible: root.offsetFor(modelData.key) !== undefined
                     label: modelData.label
                     offsetMin: root.offsetFor(modelData.key) || 0
+                    abbrev: root.abbrevFor(modelData.key)
                 }
             }
 

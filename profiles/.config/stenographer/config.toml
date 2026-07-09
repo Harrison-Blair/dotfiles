@@ -15,9 +15,9 @@ audio.input_device = "pulse"
 audio.silence_duration_seconds = 0.8
 
 # ASR
-asr.model = "Systran/faster-whisper-large-v3"
+asr.model = "Systran/faster-distil-whisper-medium.en"
 asr.language = "en"
-asr.beam_size = 10
+asr.beam_size = 5
 asr.compute_type = "int8"
 asr.silence_threshold = 0.35
 asr.mode = "lazy"

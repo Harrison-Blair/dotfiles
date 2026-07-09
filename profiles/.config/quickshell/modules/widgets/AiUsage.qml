@@ -63,25 +63,43 @@ Item {
     }
 
     // One percentage, warn/crit-colored; dimmed when the provider is stale.
-    function pctSpan(v, dim) {
+    function pctSpan(v, dim, warn = 70, crit = 90) {
         // Fixed width for 3 digits + "%" (e.g. "100%"), right-aligned with
         // non-breaking spaces so the segment doesn't jiggle as values change.
         const num = (v === undefined || v === null ? "--" : "" + v).padStart(3, " ")
         if (v === undefined || v === null) return num + "%"
         let color = null
         if (dim) color = Theme.sep
-        else if (v >= 90) color = Theme.crit
-        else if (v >= 70) color = Theme.warn
+        else if (v >= crit) color = Theme.crit
+        else if (v >= warn) color = Theme.warn
         return color ? '<span style="color:' + color + '">' + num + "%</span>" : num + "%"
     }
-    // Bar segment: "session% / weekly% [/ monthly%] $monthly-cost"
-    function segText(prov, showMonth) {
+    // Bar segment: "session% / weekly% [/ monthly%] $monthly-cost".
+    // weekThresholds ([warn, crit]) lets Claude's weekly slot match the ntfy
+    // alert policy while the other slots keep the defaults.
+    function segText(prov, showMonth, weekThresholds) {
         const l = prov && prov.limits
         const dim = prov ? prov.status !== "ok" : false
-        const pcts = [l ? l.session_pct : null, l ? l.week_pct : null]
-        if (showMonth !== false) pcts.push(l ? l.month_pct : null)
+        const wt = weekThresholds || []
+        let s = pctSpan(l ? l.session_pct : null, dim)
+            + " / " + pctSpan(l ? l.week_pct : null, dim, wt[0], wt[1])
+        if (showMonth !== false) s += " / " + pctSpan(l ? l.month_pct : null, dim)
         const cost = prov && prov.usage ? prov.usage.month.cost : null
-        return pcts.map(v => pctSpan(v, dim)).join(" / ") + " " + fmtUsdBar(cost)
+        return s + " " + fmtUsdBar(cost)
+    }
+    // "limits: statusline · 12s ago" — which source supplied the displayed
+    // 5h/weekly figures and how old that reading is.
+    function limitsFooter(lim) {
+        if (!lim || !lim.source) return ""
+        let s = "limits: " + lim.source
+        if (lim.source_at) {
+            const sec = Math.max(0, Math.round(Date.now() / 1000 - lim.source_at))
+            const age = sec < 60 ? sec + "s"
+                : sec < 3600 ? Math.floor(sec / 60) + "m"
+                : Math.floor(sec / 3600) + "h"
+            s += " · " + age + " ago"
+        }
+        return s
     }
 
     function usageRow(label, w) {
@@ -186,7 +204,7 @@ Item {
         }
         Text {
             textFormat: Text.RichText
-            text: root.segText(root.stats ? root.stats.claude : null, false)
+            text: root.segText(root.stats ? root.stats.claude : null, false, [60, 85])
             color: Theme.fg
             font.family: Theme.fontFamily
             font.pixelSize: Theme.fontSize
@@ -233,7 +251,8 @@ Item {
                     tag: (root.stats.claude.limits && root.stats.claude.limits.plan) || "",
                     color: Theme.aiClaude,
                     p: root.stats.claude,
-                    limits: root.stats.claude.status === "error" ? "" : root.claudeLimitsBlock()
+                    limits: root.stats.claude.status === "error" ? "" : root.claudeLimitsBlock(),
+                    footer: root.limitsFooter(root.stats.claude.limits)
                 },
                 {
                     title: "OpenCode",
@@ -306,6 +325,13 @@ Item {
                     visible: section.modelData.limits !== ""
                     text: section.modelData.limits
                     color: Theme.fg
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.fontSize - 2
+                }
+                Text {
+                    visible: (section.modelData.footer || "") !== ""
+                    text: section.modelData.footer || ""
+                    color: Theme.sep
                     font.family: Theme.fontFamily
                     font.pixelSize: Theme.fontSize - 2
                 }
