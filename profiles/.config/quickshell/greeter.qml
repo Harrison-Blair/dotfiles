@@ -2,16 +2,20 @@ import Quickshell
 import Quickshell.Services.Greetd
 import QtQuick
 import qs.services
+import qs.components
 
 // greetd graphical greeter. Run under cage before login:
 //   cage -s -- qs -p /home/penguin/.config/quickshell/greeter.qml
 // cage fullscreens this single xdg-toplevel. On successful PAM auth greetd
 // launches the session and quickshell exits (launch() quits by default).
+// The visuals live in the shared components/AuthPanel.qml (also used by the
+// lock screen); this file only wires it to the Greetd backend.
 ShellRoot {
     id: app
 
     property string errorMsg: ""
     property string pendingPassword: ""
+    property bool busy: false          // true between submit and result; gates re-submit
 
     // Pin the greeter to DP-1 (cage exposes wlroots connector names). Fall back
     // to the first output if DP-1 isn't present.
@@ -25,11 +29,20 @@ ShellRoot {
     readonly property real s: 1.5   // global UI scale
 
     function submit(username, password) {
-        if (username.length === 0)
+        if (app.busy || username.length === 0)
             return
         app.errorMsg = ""
+        app.busy = true
         app.pendingPassword = password
         Greetd.createSession(username)
+    }
+
+    // Reset after a failed/aborted attempt: clear state, unlock input, shake.
+    function fail(message) {
+        app.errorMsg = (message && message.length) ? message : "Authentication failed"
+        app.pendingPassword = ""
+        app.busy = false
+        panel.reportFailure()
     }
 
     Connections {
@@ -48,97 +61,31 @@ ShellRoot {
         }
 
         function onAuthFailure(message) {
-            app.errorMsg = (message && message.length) ? message : "Authentication failed"
-            app.pendingPassword = ""
+            app.fail(message)
         }
 
         function onError(message) {
-            app.errorMsg = message
-            app.pendingPassword = ""
+            app.fail(message)
         }
     }
 
     FloatingWindow {
-        color: "#1e1e1e"
+        color: "black"
         screen: app.targetScreen
         fullscreen: true
 
-        Component.onCompleted: userInput.forceActiveFocus()
+        Component.onCompleted: panel.focusInput()
 
-        Column {
-            anchors.centerIn: parent
-            spacing: 20 * app.s
-
-            Text {
-                anchors.horizontalCenter: parent.horizontalCenter
-                text: Theme.icoLock
-                color: Theme.fg
-                font.family: Theme.iconFont
-                font.pixelSize: 72 * app.s
-            }
-
-            // Username
-            Rectangle {
-                width: 320 * app.s
-                height: 42 * app.s
-                radius: Theme.radius
-                color: Qt.rgba(1, 1, 1, 0.06)
-                border.width: 1
-                border.color: userInput.activeFocus ? Theme.accent : Theme.border
-
-                TextInput {
-                    id: userInput
-                    anchors.fill: parent
-                    anchors.leftMargin: 16 * app.s
-                    anchors.rightMargin: 16 * app.s
-                    verticalAlignment: TextInput.AlignVCenter
-                    text: "penguin"
-                    color: Theme.fg
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.fontSize * app.s
-                    clip: true
-                    onAccepted: passInput.forceActiveFocus()
-                    KeyNavigation.tab: passInput
-                }
-            }
-
-            // Password
-            Rectangle {
-                width: 320 * app.s
-                height: 42 * app.s
-                radius: Theme.radius
-                color: Qt.rgba(1, 1, 1, 0.06)
-                border.width: 1
-                border.color: passInput.activeFocus ? Theme.accent : Theme.border
-
-                TextInput {
-                    id: passInput
-                    anchors.fill: parent
-                    anchors.leftMargin: 16 * app.s
-                    anchors.rightMargin: 16 * app.s
-                    verticalAlignment: TextInput.AlignVCenter
-                    echoMode: TextInput.Password
-                    passwordCharacter: "•"
-                    color: Theme.fg
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.fontSize * app.s
-                    clip: true
-                    onAccepted: {
-                        app.submit(userInput.text, text)
-                        text = ""
-                    }
-                    KeyNavigation.backtab: userInput
-                }
-            }
-
-            Text {
-                anchors.horizontalCenter: parent.horizontalCenter
-                visible: app.errorMsg !== ""
-                text: app.errorMsg
-                color: Theme.crit
-                font.family: Theme.fontFamily
-                font.pixelSize: (Theme.fontSize - 1) * app.s
-            }
+        AuthPanel {
+            id: panel
+            anchors.fill: parent
+            uiScale: app.s
+            showUser: true
+            userText: "penguin"
+            wallpaperSource: Theme.wallpaper
+            errorMsg: app.errorMsg
+            busy: app.busy
+            onSubmitted: (username, password) => app.submit(username, password)
         }
     }
 }

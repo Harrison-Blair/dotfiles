@@ -40,6 +40,17 @@ Singleton {
     readonly property color aiClaude: "#d97757"               // Claude brand orange
     readonly property color aiCursor: "#cccccc"               // Cursor gray/white
 
+    // --- Auth screens (greeter / lock) ---
+    // Bundled wallpaper (an unblurred copy of the desktop wallpaper), reachable
+    // by the pre-login `greeter` user. Resolved from services/ so it works no
+    // matter which host embeds AuthPanel. The lock screen prefers the live
+    // `awww` wallpaper and falls back to this.
+    readonly property url wallpaper: Qt.resolvedUrl("../assets/wallpaper.jpg")
+    readonly property color glassBg: Qt.rgba(1, 1, 1, 0.06)      // frosted card fill
+    readonly property color glassBorder: Qt.rgba(1, 1, 1, 0.14)  // frosted card edge
+    readonly property color dimFg: Qt.rgba(1, 1, 1, 0.7)         // secondary text on glass
+    readonly property int authTimeSize: 56                        // big clock on auth screens
+
     // --- Sensor critical thresholds (°C), from scripts/sensors.sh ---
     readonly property int critCpu: 85
     readonly property int critDgpu: 90
@@ -86,6 +97,11 @@ Singleton {
     readonly property string icoLogout:   String.fromCodePoint(0xF0343)  // md logout
     readonly property string icoReboot:   String.fromCodePoint(0xEAD2)   // cod debug-restart
     readonly property string icoShutdown: String.fromCodePoint(0xF0425)  // md power
+
+    // auth screens (greeter / lock)
+    readonly property string icoEye:      String.fromCodePoint(0xF0208)  // md eye (reveal)
+    readonly property string icoEyeOff:   String.fromCodePoint(0xF0209)  // md eye-off (hide)
+    readonly property string icoCapsLock: String.fromCodePoint(0xF0632)  // md apple-keyboard-caps
 
     // sensors (scripts/sensors.sh)
     readonly property string icoSensCpu:    String.fromCodePoint(0xF4BC)

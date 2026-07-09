@@ -13,6 +13,7 @@ local closeWindowBind = hl.bind(mainMod .. " + C", hl.dsp.window.close())
 -- Force-kill: enters "kill mode" (crosshair). Left-click a window to SIGKILL its
 -- process. Press ESC or right-click to cancel without killing anything.
 hl.bind(mainMod .. " + K", hl.dsp.exec_cmd("hyprctl kill"))
+hl.bind(mainMod .. " + L", hl.dsp.exec_cmd("qs ipc call lock lock"))
 hl.bind(mainMod .. " + M", hl.dsp.exec_cmd("command -v hyprshutdown >/dev/null 2>&1 && hyprshutdown || hyprctl dispatch 'hl.dsp.exit()'"))
 hl.bind(mainMod .. " + E", hl.dsp.exec_cmd(fileManager))
 hl.bind(mainMod .. " + F", hl.dsp.exec_cmd(webBrowser))

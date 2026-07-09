@@ -20,30 +20,6 @@ u = usage or {}
 rl = d.get("rate_limits") or {}
 five = rl.get("five_hour") or {}
 week = rl.get("seven_day") or {}
-
-# Persist the latest rate_limits capture for the usage monitor (cc-push.sh
-# ships this to the homelab aggregator). Must never break the status line.
-try:
-    import os, socket, time, tempfile
-    if rl:
-        state_dir = os.path.expanduser("~/.local/state/claude-usage")
-        os.makedirs(state_dir, exist_ok=True)
-        cap = {
-            "host": socket.gethostname(),
-            "captured_at": int(time.time()),
-            "five_hour_pct": five.get("used_percentage"),
-            "five_hour_reset": five.get("resets_at"),
-            "seven_day_pct": week.get("used_percentage"),
-            "seven_day_reset": week.get("resets_at"),
-            "model": (d.get("model") or {}).get("display_name"),
-        }
-        fd, tmp = tempfile.mkstemp(dir=state_dir)
-        with os.fdopen(fd, "w") as f:
-            json.dump(cap, f)
-        os.replace(tmp, os.path.join(state_dir, "capture.json"))
-except Exception:
-    pass
-
 def s(v):
     return "" if v is None else v
 print(s((d.get("model") or {}).get("display_name")))
