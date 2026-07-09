@@ -169,14 +169,17 @@ pub fn relocate_overrides(
 
 /// Apply one profile key into `~`: back up any existing target to
 /// `<name>.bak-<ts>`, copy the shared `profiles/<key>`, overlay
-/// `profiles/hosts/<hostname>/<key>` on top, then for declared override paths with
-/// no host copy, keep the local copy from the just-made backup (warning when
-/// neither exists). Mirrors `apply_key`.
+/// `profiles/hosts/<hostname>/<key>` on top, then — for a whitelisted key — carry back
+/// from the backup every top-level entry the includes whitelist doesn't track (so a
+/// wholesale apply doesn't wipe untracked local state like `.claude/.credentials.json`),
+/// and finally for declared override paths with no host copy, keep the local copy from
+/// the backup (warning when neither exists). Mirrors `apply_key`.
 pub fn apply_key(
     paths: &Paths,
     key: &str,
     ts: &str,
     overrides: &HashMap<String, Vec<String>>,
+    includes: &HashMap<String, Vec<String>>,
     hostname: &str,
 ) {
     let src = paths.profiles_dir.join(key);
@@ -212,6 +215,26 @@ pub fn apply_key(
     let overlay = paths.hosts_dir.join(hostname).join(key);
     if overlay.is_dir() {
         let _ = merge_copy_tree(&overlay, &dst);
+    }
+
+    // For a whitelisted folder, sync only tracked entries into `profiles/`, so a
+    // wholesale apply would wipe everything untracked (e.g. `.claude/.credentials.json`,
+    // logging the user out). Carry those untracked entries back from the backup: the
+    // repo owns the whitelisted names, the local machine keeps the rest.
+    if let (Some(list), Some(b)) = (includes.get(key), bak.as_ref()) {
+        let tracked: HashSet<&str> = list
+            .iter()
+            .filter_map(|e| e.split('/').next())
+            .collect();
+        if let Ok(entries) = std::fs::read_dir(b) {
+            for entry in entries.flatten() {
+                let name = entry.file_name();
+                if tracked.contains(name.to_string_lossy().as_ref()) {
+                    continue;
+                }
+                let _ = copy_any(&b.join(&name), &dst.join(&name));
+            }
+        }
     }
 
     if let Some(rels) = overrides.get(key) {
@@ -309,6 +332,55 @@ mod tests {
 
         assert!(dst.join("keep.txt").exists());
         assert!(!dst.join("skip.txt").exists());
+
+        fs::remove_dir_all(&tmp).unwrap();
+    }
+
+    #[test]
+    fn apply_key_preserves_untracked_entries() {
+        let tmp = std::env::temp_dir().join(format!("copytest-apply-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&tmp);
+        let home = tmp.join("home");
+        let repo = tmp.join("repo");
+        let profiles = repo.join("profiles");
+        let hosts = profiles.join("hosts");
+        fs::create_dir_all(&home).unwrap();
+        fs::create_dir_all(&hosts).unwrap();
+
+        // Tracked snapshot: profiles/.claude/settings.json (repo owns this).
+        fs::create_dir_all(profiles.join(".claude")).unwrap();
+        fs::write(profiles.join(".claude").join("settings.json"), b"new").unwrap();
+
+        // Live ~/.claude: stale settings + untracked credentials + untracked projects/.
+        fs::create_dir_all(home.join(".claude").join("projects")).unwrap();
+        fs::write(home.join(".claude").join("settings.json"), b"old").unwrap();
+        fs::write(home.join(".claude").join(".credentials.json"), b"token").unwrap();
+        fs::write(home.join(".claude").join("projects").join("p.json"), b"proj").unwrap();
+
+        let paths = Paths {
+            home: home.clone(),
+            config_dir: home.join(".config"),
+            claude_dir: home.join(".claude"),
+            repo_root: repo.clone(),
+            profiles_dir: profiles.clone(),
+            hosts_dir: hosts.clone(),
+            data_dir: repo.join("config"),
+            cache_dir: repo.join("config").join("cache"),
+        };
+        let overrides: HashMap<String, Vec<String>> = HashMap::new();
+        let mut includes: HashMap<String, Vec<String>> = HashMap::new();
+        includes.insert(".claude".to_string(), vec!["settings.json".to_string()]);
+
+        apply_key(&paths, ".claude", "20260708-000000", &overrides, &includes, "testhost");
+
+        let applied = home.join(".claude");
+        // Untracked entries survived (carried back from the backup).
+        assert_eq!(fs::read(applied.join(".credentials.json")).unwrap(), b"token");
+        assert_eq!(fs::read(applied.join("projects").join("p.json")).unwrap(), b"proj");
+        // Tracked entry now matches the repo version.
+        assert_eq!(fs::read(applied.join("settings.json")).unwrap(), b"new");
+        // A backup was made.
+        assert!(home.join(".claude.bak-20260708-000000").exists());
 
         fs::remove_dir_all(&tmp).unwrap();
     }

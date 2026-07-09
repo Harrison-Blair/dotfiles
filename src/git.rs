@@ -25,6 +25,45 @@ pub fn git(paths: &Paths, args: &[&str]) -> bool {
     ok
 }
 
+/// Best-effort quiet refresh so the latest committed profiles are available to
+/// apply: `git pull --rebase` in the repo root, capturing output. Returns `None`
+/// (no message, stay silent) when the pull succeeds, when the tree is already up to
+/// date, or when there is no upstream tracking branch to pull from. Returns
+/// `Some(msg)` — a one-line reason to warn about — only when a pull was attempted
+/// (an upstream exists) and it failed. Never prints; the caller decides how to warn.
+pub fn refresh_from_remote(paths: &Paths) -> Option<String> {
+    // No upstream tracking branch (fresh repo / no remote) → nothing to pull.
+    let upstream = std::process::Command::new("git")
+        .args(["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"])
+        .current_dir(&paths.repo_root)
+        .output();
+    if !matches!(upstream, Ok(o) if o.status.success()) {
+        return None;
+    }
+
+    let out = std::process::Command::new("git")
+        .args(["pull", "--rebase"])
+        .current_dir(&paths.repo_root)
+        .output();
+    match out {
+        Ok(o) if o.status.success() => None,
+        Ok(o) => Some(summarize_pull_failure(&String::from_utf8_lossy(&o.stderr))),
+        Err(e) => Some(format!("could not run git: {e}")),
+    }
+}
+
+/// Pick a single-line reason from `git pull` stderr for the warning. Uses the last
+/// non-empty line (git's most specific message), falling back to a generic string.
+fn summarize_pull_failure(stderr: &str) -> String {
+    stderr
+        .lines()
+        .rev()
+        .map(str::trim)
+        .find(|l| !l.is_empty())
+        .map(str::to_string)
+        .unwrap_or_else(|| "git pull --rebase failed".to_string())
+}
+
 /// Map each `profiles/` key to a "last synced" line via a single
 /// `git log --format=%x00%cI%x1f%s --name-only -- profiles` traversal (newest
 /// first; the first commit touching `profiles/<key>` or `profiles/<key>/…` wins).
@@ -134,6 +173,114 @@ fn match_sync_subject(subject: &str) -> Option<(String, String)> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::path::{Path, PathBuf};
+    use std::process::Command;
+
+    #[test]
+    fn summarize_pull_failure_picks_last_nonempty_line() {
+        let stderr = "First line\nerror: cannot pull with rebase\n\n";
+        assert_eq!(summarize_pull_failure(stderr), "error: cannot pull with rebase");
+        assert_eq!(summarize_pull_failure("   \n\n"), "git pull --rebase failed");
+    }
+
+    // --- integration tests exercising the real `git pull --rebase` behavior ---
+
+    /// Run git in `dir`, isolated from the user's global/system config so commits
+    /// use the explicit identity below and nothing external interferes.
+    fn git_in(dir: &Path, args: &[&str]) -> std::process::Output {
+        Command::new("git")
+            .args(args)
+            .current_dir(dir)
+            .env("GIT_CONFIG_GLOBAL", "/dev/null")
+            .env("GIT_CONFIG_SYSTEM", "/dev/null")
+            .env("GIT_TERMINAL_PROMPT", "0")
+            .output()
+            .expect("git available")
+    }
+
+    fn commit_all(dir: &Path, msg: &str) {
+        git_in(dir, &["add", "-A"]);
+        git_in(
+            dir,
+            &["-c", "user.email=t@e", "-c", "user.name=t", "commit", "-m", msg],
+        );
+    }
+
+    fn paths_at(root: &Path) -> Paths {
+        Paths {
+            home: root.to_path_buf(),
+            config_dir: root.join(".config"),
+            claude_dir: root.join(".claude"),
+            repo_root: root.to_path_buf(),
+            profiles_dir: root.join("profiles"),
+            hosts_dir: root.join("profiles/hosts"),
+            data_dir: root.join("config"),
+            cache_dir: root.join("config/cache"),
+        }
+    }
+
+    /// Build a bare remote with one commit, clone it to `local` (remote-tracking set
+    /// up), then advance the remote by one commit via a second clone. Returns the
+    /// `local` path — one commit behind its upstream.
+    fn upstream_ahead(tag: &str) -> (PathBuf, PathBuf) {
+        let tmp = std::env::temp_dir().join(format!("gittest-{tag}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&tmp);
+        std::fs::create_dir_all(&tmp).unwrap();
+        let remote = tmp.join("remote.git");
+        git_in(&tmp, &["init", "--bare", "-b", "main", remote.to_str().unwrap()]);
+
+        let seed = tmp.join("seed");
+        git_in(&tmp, &["clone", remote.to_str().unwrap(), seed.to_str().unwrap()]);
+        std::fs::write(seed.join("f.txt"), b"v1").unwrap();
+        commit_all(&seed, "init");
+        git_in(&seed, &["push", "-u", "origin", "main"]);
+
+        let local = tmp.join("local");
+        git_in(&tmp, &["clone", remote.to_str().unwrap(), local.to_str().unwrap()]);
+
+        // Advance the remote from a throwaway clone.
+        let other = tmp.join("other");
+        git_in(&tmp, &["clone", remote.to_str().unwrap(), other.to_str().unwrap()]);
+        std::fs::write(other.join("f.txt"), b"v2").unwrap();
+        commit_all(&other, "update");
+        git_in(&other, &["push", "origin", "main"]);
+
+        (tmp, local)
+    }
+
+    #[test]
+    fn refresh_no_upstream_is_silent() {
+        let tmp = std::env::temp_dir().join(format!("gittest-noups-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&tmp);
+        std::fs::create_dir_all(&tmp).unwrap();
+        git_in(&tmp, &["init", "-b", "main", "."]);
+        std::fs::write(tmp.join("f.txt"), b"v1").unwrap();
+        commit_all(&tmp, "init");
+
+        // A committed repo with no configured upstream must stay silent.
+        assert_eq!(refresh_from_remote(&paths_at(&tmp)), None);
+        std::fs::remove_dir_all(&tmp).unwrap();
+    }
+
+    #[test]
+    fn refresh_success_pulls_and_is_silent() {
+        let (tmp, local) = upstream_ahead("ok");
+        assert_eq!(refresh_from_remote(&paths_at(&local)), None);
+        // The remote's newer commit is now present locally.
+        assert_eq!(std::fs::read(local.join("f.txt")).unwrap(), b"v2");
+        std::fs::remove_dir_all(&tmp).unwrap();
+    }
+
+    #[test]
+    fn refresh_failure_returns_message() {
+        let (tmp, local) = upstream_ahead("fail");
+        // Dirty the tracked file so `pull --rebase` (which must replay onto the
+        // advanced upstream) refuses with a non-zero exit.
+        std::fs::write(local.join("f.txt"), b"local-dirty").unwrap();
+        let msg = refresh_from_remote(&paths_at(&local));
+        assert!(msg.is_some(), "expected a warning message on failed pull");
+        std::fs::remove_dir_all(&tmp).unwrap();
+    }
 
     #[test]
     fn format_sync_matches_sync_subject() {

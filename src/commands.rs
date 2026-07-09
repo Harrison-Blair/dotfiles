@@ -227,6 +227,7 @@ pub fn cmd_apply(paths: &Paths, names: Option<&[String]>) {
     let host = hostname();
     let ignore = config::load_ignore(paths);
     let overrides = config::load_overrides(paths);
+    let includes = config::load_includes(paths);
     let mut nodes = tree::build_apply_tree(paths, &ignore);
     let ts = backup_ts();
 
@@ -239,7 +240,7 @@ pub fn cmd_apply(paths: &Paths, names: Option<&[String]>) {
             return;
         }
         for key in names {
-            copy::apply_key(paths, key, &ts, &overrides, &host);
+            copy::apply_key(paths, key, &ts, &overrides, &includes, &host);
         }
         return;
     }
@@ -264,7 +265,7 @@ pub fn cmd_apply(paths: &Paths, names: Option<&[String]>) {
         }
         let _ = config::save_cache(paths, "apply", &keys);
         for key in &keys {
-            copy::apply_key(paths, key, &ts, &overrides, &host);
+            copy::apply_key(paths, key, &ts, &overrides, &includes, &host);
         }
         return;
     }
@@ -386,6 +387,13 @@ pub fn run_menu(paths: &Paths) {
         println!("Usage: tui [-s | -a [NAME...] | -c | -P]");
         std::process::exit(2);
     }
+
+    // Best-effort refresh so the newest committed profiles are available to apply.
+    // Silent on success / up-to-date / no upstream; warn only if a pull failed.
+    if let Some(err) = git::refresh_from_remote(paths) {
+        println!("{}", ui::yellow(&format!("Could not refresh profiles from remote: {err}")));
+    }
+
     let options: Vec<(String, String)> = [
         ("sync", "Save dotfiles"),
         ("apply", "Apply dotfiles"),
