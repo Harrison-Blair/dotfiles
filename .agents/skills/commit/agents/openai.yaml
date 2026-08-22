@@ -1,0 +1,4 @@
+interface:
+  display_name: "Commit"
+  short_description: "Summarize, commit, and optionally push changes"
+  default_prompt: "Use $commit to review and summarize my Git changes, then help me commit them."
