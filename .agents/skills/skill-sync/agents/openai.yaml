@@ -1,0 +1,4 @@
+interface:
+  display_name: "SkillSync"
+  short_description: "Pull or push portable skills through dotfiles"
+  default_prompt: "Use $skill-sync to push my canonical agent skills through my dotfiles repository."
