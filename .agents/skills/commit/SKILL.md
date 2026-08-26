@@ -13,12 +13,19 @@ If the working tree is clean, say so and stop.
 
 If the request contains the word `approve` (for example `/commit approve` or `$commit approve`), the user has already authorized both the commit and the push. Ask nothing. Do everything below in one pass, then report once.
 
-1. Resolve the current local branch and its configured upstream (`git rev-parse --abbrev-ref --symbolic-full-name @{upstream}`) and the push URL of that remote. Do not change Git configuration.
-2. Stage all repository changes with `git add -A`, review the staged diff, write a concise commit message that reflects it, and commit. Stop and report any staging or commit failure.
-3. If an upstream is configured, run a plain `git push` — no remote or branch arguments, no `-u`, no force. If no upstream is configured, skip the push; never guess a remote or branch.
-4. Report in a few lines: the commit hash and subject, the branch, and either "pushed to `<upstream>` via `<push-url>`", "push failed: <reason> (commit is local)", or "not pushed: no upstream configured for `<branch>`".
+When running in Codex, read [references/providers/codex.md](references/providers/codex.md) before invoking the helper.
 
-Only a staging or commit failure interrupts the fast path; a push failure is reported, not retried.
+1. Review all tracked and untracked changes and write a concise commit message that reflects them.
+2. From anywhere inside the target repository, run the helper with that message as its single argument:
+
+   ```sh
+   "$HOME/.agents/skills/commit/scripts/commit-and-push.sh" "<commit message>"
+   ```
+
+3. Do not stage, commit, or push with separate commands. The helper resolves the local branch, configured upstream branch, and push URL before mutation; stages all changes; checks and commits the staged diff; then pushes with an explicit `git push <remote> HEAD:refs/heads/<upstream-branch>` refspec. It never guesses a destination, configures an upstream, or force-pushes.
+4. Report the helper's result: commit hash and subject, local branch, and exact push destination. If it reports a push failure, make clear that the commit remains local.
+
+Stop on any helper failure and do not retry or bypass it with ad hoc Git commands.
 
 ## Interactive path
 
@@ -28,7 +35,7 @@ Without `approve`:
 2. Ask the user to choose **Commit**, **Commit and push**, or **More info**. Do not mutate Git before they choose.
 3. **More info**: ask whether they want an expanded file-by-file summary or suggested code/test improvements, and provide it without changing files, committing, or pushing.
 4. **Commit**: stage all changes with `git add -A`, review the staged diff, commit with a concise message, and report the hash and subject.
-5. **Commit and push**: the choice itself is the push authorization; do not ask a second time. Run the fast path above from step 1 and report the same way, including the destination that was used.
+5. **Commit and push**: the choice itself is the push authorization; do not ask a second time. Run the fast path above and report the same way, including the destination that was used.
 
 ## Commit message rules
 
