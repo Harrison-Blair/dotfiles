@@ -6,7 +6,7 @@ test_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 engine=$test_dir/../scripts/sync.sh
 repo_root=$(cd -- "$test_dir/../../../.." && pwd)
 pull_wrapper=$repo_root/scripts/pull.sh
-push_wrapper=$repo_root/scripts/push.sh
+send_wrapper=$repo_root/scripts/send.sh
 fixture_root=$(mktemp -d /tmp/skill-sync-tests.XXXXXX)
 test_count=0
 
@@ -171,7 +171,7 @@ assert_file_contains "$repo/.agents/skills/alpha/SKILL.md" 'remote-v2' 'failed p
 assert_absent "$repo/.agents/skills/beta" 'failed push confirmation does not add skills'
 pass 'noninteractive push requires --yes without changing managed files'
 
-output=$(HOME="$test_home" "$push_wrapper" --yes 2>&1)
+output=$(HOME="$test_home" "$send_wrapper" --yes 2>&1)
 assert_contains "$output" 'Managed changes to commit:' 'approved push shows the staged file list'
 assert_contains "$output" 'Commit:' 'approved push reports its commit'
 assert_file_contains "$repo/.agents/skills/alpha/SKILL.md" 'machine-v3' 'approved push updates repo content'
@@ -185,7 +185,7 @@ assert_file_contains "$repo/.agents/skills/beta/SKILL.md" 'machine-beta-v1' 'app
   fail 'approved push uses the managed commit message'
 remote_alpha=$(git --git-dir="$remote" show main:.agents/skills/alpha/SKILL.md)
 assert_contains "$remote_alpha" 'machine-v3' 'approved push publishes canonical content to the remote'
-pass 'push wrapper copies, commits, and publishes managed changes'
+pass 'send wrapper copies, commits, and publishes managed changes'
 
 output=$(HOME="$test_home" "$engine" push 2>&1)
 assert_contains "$output" 'No managed changes or local commits to push' 'no-change push reports a no-op'

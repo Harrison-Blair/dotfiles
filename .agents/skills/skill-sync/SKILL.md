@@ -28,7 +28,7 @@ entry points:
 
 ```sh
 "$HOME/source/dotfiles/scripts/pull.sh"
-"$HOME/source/dotfiles/scripts/push.sh"
+"$HOME/source/dotfiles/scripts/send.sh"
 ```
 
 Both commands fast-forward the repository, print an `ADD`, `UPDATE`, and `LINK`
