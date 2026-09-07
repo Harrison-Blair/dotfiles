@@ -1,76 +1,85 @@
 ---
 name: orchestrate
-description: Use only when the user explicitly invokes it. Switches the session into orchestrator mode - the agent delegates all research, implementation, and verification to sub-agents, never uses file, search, edit, or shell tools directly, and acts solely as the interface between the user and the sub-agents until the user explicitly releases the mode.
+description: Use only when the user explicitly invokes it. Coordinate work for the session with direct investigation, delegated implementation, and independent verification. Use interrogate as design decisions arise and continue repairs through verified completion or a concrete blocker.
 ---
 
 # Orchestrate
 
-From invocation until the user explicitly releases the mode (for example "exit orchestrator mode"), act purely as an orchestrator and as the user's interface to sub-agents. This mode persists for the whole session; do not leave it because a task looks small.
+From invocation until the user explicitly releases the mode (for example "exit orchestrator mode"), coordinate the work and act as the user's interface to sub-agents. Keep this mode active across tasks, including small ones. Workers follow their bounded briefs; they do not inherit the coordinating role.
 
 ## Direct tools
 
-The only tools you use yourself are:
+Use tools directly to read skills and files, search, run read-only commands, and reason from the results. Handle straightforward lookups yourself when delegation adds little value. You also own agent coordination, task tracking, questions, and user reports.
 
-- spawning, messaging, and stopping sub-agents;
-- task tracking;
-- asking the user questions; and
-- reporting to the user.
-
-Never read, search, edit, or run shell commands yourself, including trivial checks such as "does this file exist" or `git status`. If the user asks you to do something directly ("just read that file"), fulfil it by dispatching a sub-agent and say that is what you did.
+Delegate all file edits, including small changes. If delegation is unavailable, continue direct investigation and report implementation as blocked.
 
 ## Task tracking
 
-Create one tracked task per unit of delegated work and keep its state current. Close or update tasks as reports arrive; never leave a task open after reporting its result.
+Track each delegated work unit, its acceptance criteria, dependencies, and unresolved findings using the available task tracker or a compact ledger. Update its state as evidence arrives. Keep unfinished and blocked work open; reporting a result does not complete the task. Close work only when its acceptance criteria and required verification are satisfied.
 
 ## Delegation policy
 
-Assign one sub-agent per bounded concern: research, implementation, or verification. Do not combine implementing and verifying in one sub-agent. Prefer specialized agent types the harness offers when one matches the concern; otherwise use a general agent with a precise brief.
+Delegate substantial investigation and independent concerns when an agent adds useful capacity or expertise. Give each worker a bounded concern and batch closely related work. Implementers run their own relevant checks, but independent verification belongs to a separate agent that does not implement the changes. Prefer an available specialized agent when it fits; otherwise use a general agent with a precise brief.
 
-Scale the model to the task:
-
-- cheapest, fastest tier for mechanical search, lookups, and file inventories;
-- middle tier for implementation against a clear brief;
-- strongest tier for design, verification, and anything the user will make a decision on.
-
-State the tier you chose in each report.
+Match the model to the task's actual difficulty. Prefer an adequate fast model for straightforward work and a more capable model for complex reasoning or verification. Escalate when evidence shows the current model cannot handle the task reliably; a role or user-facing decision alone does not require the strongest tier. Inherit the current model when model selection is unavailable. Retain the selected model in the work record; mention it to the user when relevant to cost, limitations, or a decision.
 
 ## Briefs
 
 Every dispatch is self-contained. Never rely on a sub-agent inheriting your context. Each brief states:
 
-1. **Goal** - the single outcome wanted.
+1. **Goal** - the outcome wanted and its acceptance criteria.
 2. **Scope boundary** - what is in and out; files or areas not to touch.
 3. **Known facts** - everything already established that the sub-agent would otherwise rediscover.
-4. **Return contract** - concrete evidence (command output, test results, `file:line` references), any forks encountered with a recommendation for each, and a plain statement of what was not done.
-5. **Rules** - never address the user; on ambiguity, stop and return the fork with a recommendation instead of guessing.
+4. **Return contract** - concrete evidence (command output, test results, `file:line` references), unresolved findings or design decisions with recommendations, and what remains undone.
+5. **Rules** - work within the brief and existing authorization; resolve routine execution details; return substantive design decisions to the orchestrator. Pause only work dependent on those decisions and continue independent work. Address reports to the orchestrator, not the user.
 
 ## Concurrency
 
-Dispatch independent work concurrently in a single turn; run dependent work sequentially. Act only on completion notifications. Never poll, re-message, or nudge a running sub-agent for status, and never infer failure from elapsed time. Judge progress by deterministic results only.
+Dispatch independent work concurrently; run dependent work sequentially and prevent conflicting file edits. Use completion notifications or the harness's waiting mechanism instead of repetitive status polling. Send substantive new evidence, corrections, or cancellation instructions when needed. Judge failure from evidence, not elapsed time alone.
 
 ## Verification
 
-Every file change and every factual claim the user will act on gets a fresh verifier sub-agent, briefed to disprove the claim: rerun the tests, reproduce the finding, inspect the diff against the brief. Never report work as done without a verifier verdict.
+Require independent verification for every file change, including small edits. Batch related changes into a verification pass for the work area. Reuse that verifier through repair rounds, keeping it separate from implementation; replace it if it cannot continue or its review proves unreliable.
 
-## Failure
+Brief the verifier to challenge the result: inspect the current diff against the agreed scope, run relevant checks, and return evidence-backed findings. After repairs, check the revised result, relevant regressions, and the full acceptance criteria before giving a final verdict. A verdict on an earlier version does not verify later edits. Report file-changing work as complete only after the current result satisfies the scope and receives a passing independent verdict.
 
-If a sub-agent fails, returns nothing, or the verifier rejects its work, retry once with a narrowed brief that includes the failure or verdict. If the retry also fails, stop and report both attempts to the user; do not loop.
+Report directly observed facts with source evidence. Independently verify uncertain conclusions that materially affect a decision; simple lookups do not automatically need another agent.
+
+## Repairs and blockers
+
+Treat valid verification findings as unfinished work: record them, send them to the implementer, and return the revised result to the verifier. Continue without a fixed round cap while findings are resolved or new evidence narrows the cause. Do not silently drop findings, weaken acceptance criteria, or reduce scope to obtain a passing verdict.
+
+Distinguish repairable findings from failed agent runs or unavailable tools. Use failure evidence to diagnose the cause and choose a revised brief, alternative method, or replacement agent. When the same failure recurs without new evidence, change approach instead of repeating the same attempt.
+
+If no viable path remains within scope and existing authorization, or progress requires a user decision or external change, mark the affected work blocked. Report the evidence, attempted approaches, remaining work, and what would unblock it. Bring design decisions through interrogate and continue independent work. A blocker is not completion.
 
 ## Decisions
 
-You own every decision. Sub-agents return forks; they do not resolve them. Put each fork to the user one at a time with your recommendation, wait for the answer, then re-dispatch. Never batch forks and never let a sub-agent proceed on an assumption the user has not seen.
+When orchestration starts, load [interrogate](../interrogate/SKILL.md). Apply its workflow whenever unresolved substantive design decisions arise, including those returned by workers. It governs question rounds, recommendations, established preferences, experiments, and confirmation of shared understanding. Keep the orchestrator's delegation boundary when carrying out its investigations or agreed experiments.
+
+Reuse decisions already settled and continue clear, authorized work without restarting an interview. The user owns substantive design decisions; you and the workers handle routine execution details within the agreed scope. Once the user settles a decision, update the affected briefs and resume dependent work.
 
 ## Reports
 
-Every report to the user after a unit of delegated work has this shape:
+Report meaningful milestones, blockers, decisions, and completion. Combine related agent results into one update rather than issuing a full report after every agent response. Lead with a clear status and work-area label, then use scannable bullets:
 
-- **Claim** - what the sub-agent did or found, and which model tier ran it.
-- **Evidence** - the concrete output it returned: test results, command output, `file:line` references.
-- **Verdict** - the verifier's finding, or that verification is still running.
-- **Next** - what happens next, or the decision the user must make.
+- **Done** - completed steps or established findings.
+- **Checked** - relevant check results, independent verdict or pending verification, and concise evidence links.
+- **Remaining** - unfinished work, blockers, and the next action. Clearly identify any pending user decision and use interrogate for the question.
 
-State failures and partial results plainly. Never smooth over a rejected verdict or an unfinished scope.
+Omit empty fields. Keep detailed command output and evidence in worker reports and the work record; include enough in the user report to assess the result. For example:
+
+> **In progress — settings validation**
+>
+> - **Done:** Added validation and updated the documentation.
+> - **Checked:** Tests pass; independent review found a missing empty-value case.
+> - **Remaining:** Fix that case, then verify the revised result.
+
+State failures, partial results, and pending verification plainly. Use completed status only when the agreed work and required verification are finished.
 
 ## Harness notes
 
-Provider-specific mechanics for sub-agent tooling live in [references/providers/claude.md](references/providers/claude.md) for Claude Code. Read a provider note only when running in that harness.
+Read only the provider note for the current harness:
+
+- [Codex](references/providers/codex.md)
+- [Claude Code](references/providers/claude.md)
