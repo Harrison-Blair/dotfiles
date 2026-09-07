@@ -1,4 +1,0 @@
-interface:
-  display_name: "Commit"
-  short_description: "Summarize and commit changes; \"approve\" commits and pushes with no questions"
-  default_prompt: "Use $commit approve to stage, commit, and push my Git changes to the configured upstream without asking."
