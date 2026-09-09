@@ -45,6 +45,14 @@ the terminal prompt.
 "$HOME/.agents/skills/skill-sync/scripts/sync.sh" push --yes
 ```
 
+## Other machines
+
+Machines without a checkout at `$HOME/source/dotfiles` use the read-only
+client `scripts/skillsync.sh` instead of this skill. It clones the repository
+over HTTPS, replaces same-named skills wholesale, links Claude adapters, and
+leaves every other local skill alone. Installation and scheduling recipes are
+in `scripts/README.md`. Never run `send.sh` or `push` from such a machine.
+
 Do not recreate the synchronization with ad hoc copy or Git commands. The
 script checks the repository and upstream, requires a clean worktree for pull,
 and permits push to adopt pending changes only under `.agents/skills` and
