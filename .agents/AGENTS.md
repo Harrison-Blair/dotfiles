@@ -16,6 +16,7 @@
 - Honor the requested phase. Investigate, plan, review, explain, or validate without implementing unless implementation is also authorized.
 - Treat suspected bugs and review findings as hypotheses. Check actual behavior and intended design before changing code.
 - Before declaring work complete, verify the actual user-visible behavior when practical, not only an indirect proxy. State any limits that remain unverified.
+- Remove temporary files, data, and resources created for the task once the result is recorded in the required format and verified, and those items are no longer needed for delivery or verification. Preserve final deliverables and pre-existing user data. Verify cleanup before declaring the task complete.
 
 ## 1. Think Before Coding
 
